@@ -230,7 +230,11 @@ async function handlePeerLeft(who: Role) {
 
 // ── Room lifecycle ───────────────────────────────────────────────────────────
 
-export async function createGame(rawId: string, rawName: string): Promise<JoinAck> {
+export async function createGame(
+  rawId: string,
+  rawName: string,
+  settings?: RoomSettings,
+): Promise<JoinAck> {
   if (!isConfigured) return { ok: false, error: 'Online play is not configured for this build.' };
   const id = normalizeId(rawId);
   if (!id) return { ok: false, error: 'Pick a game ID (letters and numbers).' };
@@ -247,7 +251,7 @@ export async function createGame(rawId: string, rawName: string): Promise<JoinAc
       p1_present: true,
       p2_name: 'Player 2',
       p2_present: false,
-      settings: { wallHeight: 2000, difficulty: 'medium', seed: 'BETA_CLIMB_32' },
+      settings: settings ?? { wallHeight: 2000, difficulty: 'medium', seed: 'BETA_CLIMB_32' },
     })
     .select()
     .single();

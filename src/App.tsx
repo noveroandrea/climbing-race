@@ -8,6 +8,7 @@ import { GameSettings, SerializedClimberState, FinalHeights } from './types';
 import { ClimbingCanvas } from './components/ClimbingCanvas';
 import { InstructionsModal } from './components/InstructionsModal';
 import { QuickGuide } from './components/InstructionsContent';
+import { RouteArchitecture, randomSeed } from './components/RouteArchitecture';
 import { motion } from 'motion/react';
 import {
   Trophy,
@@ -15,7 +16,6 @@ import {
   Play,
   RotateCcw,
   Sparkles,
-  Settings,
   HelpCircle,
   Timer,
   Info,
@@ -30,7 +30,7 @@ import {
   PersonStanding,
 } from 'lucide-react';
 import * as net from './net';
-import type { Role, RoomState, JoinAck } from './net';
+import type { Role, RoomState, RoomSettings, JoinAck } from './net';
 import { isConfigured } from './lib/supabase';
 
 /** One line of scores.txt, as served by GET /api/scores. */
@@ -86,6 +86,12 @@ export default function App() {
   const [gameIdInput, setGameIdInput] = useState(randomGameId());
   const [joinError, setJoinError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Route picked on the create-game form, before a room exists to push it to.
+  const [draftSettings, setDraftSettings] = useState<RoomSettings>({
+    wallHeight: 2000,
+    difficulty: 'medium',
+    seed: 'BETA_CLIMB_32',
+  });
   const [role, setRole] = useState<Role | null>(null);
   const [room, setRoom] = useState<RoomState | null>(null);
   const [copied, setCopied] = useState(false);
@@ -247,6 +253,7 @@ export default function App() {
     setMode('multi');
     setJoinError(null);
     setGameIdInput(randomGameId());
+    setDraftSettings(s => ({ ...s, seed: randomSeed() }));
     setScreen('create');
   };
 
@@ -266,7 +273,7 @@ export default function App() {
     setBusy(true);
     setJoinError(null);
     const ack: JoinAck = event === 'create-game'
-      ? await net.createGame(gameId, myName)
+      ? await net.createGame(gameId, myName, draftSettings)
       : await net.joinGame(gameId, myName);
     setBusy(false);
     if (!ack.ok) {
@@ -305,9 +312,6 @@ export default function App() {
     if (!settingsEditable) return;
     void net.updateSettings(patch);
   };
-
-  const generateRandomSeed = () =>
-    pushSettings({ seed: `ROUTE_${Math.random().toString(36).substring(2, 9).toUpperCase()}` });
 
   // ── Finish handling ───────────────────────────────────────────────────────
   const applyRaceOver = (
@@ -603,6 +607,19 @@ export default function App() {
               className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-4 py-2.5 text-white font-bold text-center outline-none mb-5 font-sans transition-colors"
             />
 
+            {/* The host picks the route up front; it goes into the room on create
+                and stays editable in the lobby. */}
+            {screen === 'create' && (
+              <div className="mb-5">
+                <RouteArchitecture
+                  settings={draftSettings}
+                  editable={!busy}
+                  onChange={patch => setDraftSettings(s => ({ ...s, ...patch }))}
+                  className="bg-slate-950/50 border border-slate-800 rounded-xl p-4"
+                />
+              </div>
+            )}
+
             {joinError && (
               <p className="text-rose-400 text-[15.5px] font-medium text-center mb-4 bg-rose-950/40 border border-rose-500/30 rounded-lg px-3 py-2">
                 {joinError}
@@ -664,87 +681,12 @@ export default function App() {
 
             {/* Route configuration — multiplayer only; solo is a fixed route */}
             {showRouteArch && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
-              <h3 className="text-[15.5px] uppercase tracking-wider text-slate-400 font-bold mb-3.5 flex items-center gap-1.5 font-sans">
-                <Settings className="w-3.5 h-3.5 text-sky-400" />
-                Route Architecture
-                {!isHost && <span className="ml-auto text-[11.5px] font-mono text-amber-400/80 border border-amber-500/20 rounded px-1">set by host</span>}
-              </h3>
-
-              <div className="space-y-4 text-[15.5px] font-sans">
-                {/* Difficulty */}
-                <div>
-                  <label className="text-slate-400 block mb-1.5 font-medium">Gym Grade Route</label>
-                  <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800/80">
-                    {(['easy', 'medium', 'hard'] as const).map(d => (
-                      <button
-                        key={d}
-                        disabled={!settingsEditable}
-                        onClick={() => pushSettings({ difficulty: d })}
-                        className={`py-1 text-center font-bold tracking-tight rounded-lg uppercase text-[12.5px] transition-all cursor-pointer ${
-                          activeSettings.difficulty === d ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed'
-                        }`}
-                      >
-                        {d}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Target height */}
-                <div>
-                  <div className="flex justify-between items-center mb-1.5 text-slate-400">
-                    <label className="font-medium">Target Height</label>
-                    <span className="font-mono text-sky-400 font-bold">{activeSettings.wallHeight / 100}m</span>
-                  </div>
-                  <div className="grid grid-cols-4 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800/80">
-                    {([1000, 2000, 3000, 4000] as const).map(h => (
-                      <button
-                        key={h}
-                        disabled={!settingsEditable}
-                        onClick={() => pushSettings({ wallHeight: h })}
-                        className={`py-1 text-center font-bold tracking-tight rounded-lg text-[12.5px] transition-all cursor-pointer ${
-                          activeSettings.wallHeight === h ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed'
-                        }`}
-                      >
-                        {h / 100}m
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Time limit */}
-                <div className="flex items-center justify-between px-3 py-2 bg-slate-950/60 rounded-xl border border-slate-800">
-                  <div className="flex items-center gap-1.5 text-slate-400">
-                    <Timer className="w-3.5 h-3.5 text-sky-400" />
-                    <span className="font-medium">Time Limit</span>
-                  </div>
-                  <span className="font-mono text-sky-400 font-bold">3:00</span>
-                </div>
-
-                {/* Seed */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-slate-400 font-medium">Route Seed</label>
-                    {settingsEditable && (
-                      <button
-                        onClick={generateRandomSeed}
-                        className="text-[13px] text-sky-400 hover:text-sky-300 transition-all font-semibold uppercase shrink-0"
-                      >
-                        Reseed
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    value={activeSettings.seed}
-                    disabled={!settingsEditable}
-                    onChange={e => pushSettings({ seed: e.target.value.replace(/\s+/g, '_').substring(0, 16) })}
-                    className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700/60 rounded-xl px-3 py-1.5 font-mono text-[15.5px] text-sky-300 tracking-wide font-bold outline-none focus:border-sky-500 uppercase disabled:opacity-60 disabled:cursor-not-allowed"
-                  />
-                </div>
-              </div>
-            </div>
+              <RouteArchitecture
+                settings={activeSettings}
+                editable={settingsEditable}
+                onChange={pushSettings}
+                showHostBadge={!isHost}
+              />
             )}
 
             {showLeaderboard && <Leaderboard fullHeight />}
