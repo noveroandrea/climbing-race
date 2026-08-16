@@ -333,9 +333,34 @@ export async function startGame() {
 }
 
 export async function returnLobby() {
-  if (myRole !== 'p1') return;
+  if (myRole !== 'p1' || !myGameId) return;
   clearCountdownTimer();
-  await patchRoom({ phase: 'lobby', starts_at: null });
+
+  // reportFinish drops the row to free the ID, so a rematch has to put the room
+  // back rather than patch it — an UPDATE would match nothing and the guest would
+  // sit on the finish screen forever. upsert re-inserts it when it is gone and
+  // just resets the phase when it is still there. The guest hears about it either
+  // way: the subscription is on '*', so an INSERT reaches them like an UPDATE.
+  const prev = lastRow;
+  const { data, error } = await supabase
+    .from('rooms')
+    .upsert({
+      id: myGameId,
+      phase: 'lobby',
+      settings: prev?.settings ?? { wallHeight: 2000, difficulty: 'medium', seed: 'BETA_CLIMB_32' },
+      p1_name: prev?.p1_name ?? 'Player 1',
+      p1_present: true,
+      // Keep the guest in their seat, so the host can start again immediately
+      p2_name: prev?.p2_name ?? 'Player 2',
+      p2_present: prev?.p2_present ?? false,
+      starts_at: null,
+      result: null,
+      abandoned: null,
+    })
+    .select()
+    .single();
+
+  if (!error && data) publish(data as RoomRow);
 }
 
 /** Fire-and-forget position relay — broadcast only, never written to Postgres. */
@@ -357,6 +382,18 @@ export async function reportFinish(result: RaceResult) {
     .update({ phase: 'finished', result, starts_at: null })
     .eq('id', myGameId)
     .eq('phase', 'playing');
+
+  // The race is over, so drop the row and hand the ID back — otherwise it stays
+  // taken until the 6-hour sweep and the same name can't be used again. Both
+  // clients already have the result from the broadcast above, and the room
+  // subscription ignores DELETE, so this cannot blank out the finish screen.
+  // The phase guard means a room someone has *re-created* under the same ID is
+  // left alone: that one is back in 'lobby', so it does not match.
+  await supabase
+    .from('rooms')
+    .delete()
+    .eq('id', myGameId)
+    .eq('phase', 'finished');
 }
 
 // ── Leaderboard ──────────────────────────────────────────────────────────────

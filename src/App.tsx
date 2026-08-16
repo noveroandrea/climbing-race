@@ -415,7 +415,9 @@ export default function App() {
   // no room card either, the whole left column would be empty mid-climb.
   const showRoomCard = mode === 'multi' && !!room;
   const showRouteArch = mode === 'multi';
-  const showLeaderboard = screen !== 'playing';
+  // The board only ranks solo runs, so it has nothing to say during a race —
+  // in multiplayer the left column is the room card and route settings instead.
+  const showLeaderboard = screen !== 'playing' && mode !== 'multi';
   const showLeftColumn = showRoomCard || showRouteArch || showLeaderboard;
 
   return (
