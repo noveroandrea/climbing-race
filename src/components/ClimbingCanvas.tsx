@@ -475,16 +475,30 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
       }
     };
 
-    // Releasing (or leaving the canvas) cancels an in-progress nail hold
+    // Releasing (or the gesture being taken away) cancels an in-progress nail hold
     const endPress = () => { bodyPressRef.current = null; };
 
-    canvas.addEventListener('mousedown', handleClick);
-    canvas.addEventListener('mouseup', endPress);
-    canvas.addEventListener('mouseleave', endPress);
+    // Pointer events rather than mouse events: a touch only synthesises
+    // mousedown/mouseup *after* the finger lifts, milliseconds apart, so a
+    // hold-to-nail could never accumulate on a phone. pointerdown/up fire at the
+    // real moments of press and release for mouse, touch and pen alike.
+    const onDown = (e: PointerEvent) => {
+      // Stops the long-press text selection / callout menu on mobile. Needs a
+      // non-passive listener to be allowed to take effect.
+      e.preventDefault();
+      // Keep receiving events even if the finger drifts off the canvas mid-hold,
+      // so a slightly wandering thumb doesn't silently cancel the nail.
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* not fatal */ }
+      handleClick(e);
+    };
+
+    canvas.addEventListener('pointerdown', onDown, { passive: false });
+    canvas.addEventListener('pointerup', endPress);
+    canvas.addEventListener('pointercancel', endPress);
     return () => {
-      canvas.removeEventListener('mousedown', handleClick);
-      canvas.removeEventListener('mouseup', endPress);
-      canvas.removeEventListener('mouseleave', endPress);
+      canvas.removeEventListener('pointerdown', onDown);
+      canvas.removeEventListener('pointerup', endPress);
+      canvas.removeEventListener('pointercancel', endPress);
     };
   }, [gameState, settings]);
 
@@ -1755,7 +1769,7 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
 
   return (
     <div
-      className="flex flex-col items-center bg-slate-900 rounded-xl overflow-hidden p-1.5 sm:p-3 border border-slate-700/60 shadow-xl max-w-full"
+      className="flex flex-col items-center select-none bg-slate-900 rounded-xl overflow-hidden p-1.5 sm:p-3 border border-slate-700/60 shadow-xl max-w-full"
       style={{ width: frameWidth }}
       id="climb-screen-frame"
     >
@@ -1824,7 +1838,7 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
            screen scale the whole wall down instead of clipping it. Pointer
            coords are already normalised by rect.width/rect.height, so clicks
            stay accurate at any display size. */
-        className="block max-w-full h-auto touch-none bg-slate-950 border border-slate-800 rounded-lg cursor-crosshair shadow-inner"
+        className="block max-w-full h-auto touch-none select-none no-callout bg-slate-950 border border-slate-800 rounded-lg cursor-crosshair shadow-inner"
         id="gl-canvas-node"
       />
 
