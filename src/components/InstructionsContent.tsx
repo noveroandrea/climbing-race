@@ -81,8 +81,11 @@ export const QuickGuide: React.FC = () => (
         <dd className="text-slate-400">Click to select another limb, then click to select a hold.</dd>
       </div>
       <div className="flex gap-2 py-1.5">
-        <dt className="shrink-0 w-24 font-mono text-[12.5px] text-sky-400 pt-px">SPACE</dt>
-        <dd className="text-slate-400">Chalk. Needs <strong className="text-slate-200">70%</strong>, drains <strong className="text-slate-200">70%</strong>.</dd>
+        <dt className="shrink-0 w-24 font-mono text-[12.5px] text-sky-400 pt-px">SPACE · BAG</dt>
+        <dd className="text-slate-400">
+          Chalk — the key, or the bag button on the top right of the wall. Needs{' '}
+          <strong className="text-slate-200">70%</strong>, drains <strong className="text-slate-200">70%</strong>.
+        </dd>
       </div>
       <div className="flex gap-2 py-1.5">
         <dt className="shrink-0 w-24 font-mono text-[12.5px] text-amber-400 pt-px">HOLD BODY 2s</dt>
@@ -185,8 +188,9 @@ export const InstructionsContent: React.FC = () => (
           <Target className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" />
           <span>
             <strong className="text-slate-100">Chalk up</strong> with{' '}
-            <kbd className="px-1 text-slate-100 bg-slate-800 rounded font-mono text-[13px]">Space</kbd> to halve your
-            grip drain for 5 seconds and claw back some stamina.{' '}
+            <kbd className="px-1 text-slate-100 bg-slate-800 rounded font-mono text-[13px]">Space</kbd> — or tap the{' '}
+            <strong className="text-sky-300">chalk bag button on the top right of the wall</strong>, which is the way
+            to do it on a phone — to halve your grip drain for 5 seconds and claw back some stamina.{' '}
             <strong className="text-sky-300">Your chalk must be at 70% to use it, and one use drains 70%</strong> —
             leaving the bag empty. It refills slowly (~3%/s) only while you hang steady with your feet on the wall,
             so you get one dip roughly every 23 seconds. Spend it wisely.

@@ -17,8 +17,9 @@ runs out, the higher climber wins.
 ## Controls
 
 Click a limb to select it, then click a reachable hold to move it there;
-selection auto-cycles LH → RH → RF → LF. **Space** chalks up (needs 70% in the
-bag, drains 70%). **Double-tap your body** to place a rock — it eases the climb
+selection auto-cycles LH → RH → RF → LF. **Space** — or the **chalk bag button on
+the top right of the wall**, which is how you do it on a phone — chalks up (needs
+70% in the bag, drains 70%). **Double-tap your body** to place a rock — it eases the climb
 but drops you to your last nail. **Hold your body for 2 seconds** on four green
 jugs to hammer a nail, which catches your next fall.
 

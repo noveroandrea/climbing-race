@@ -42,6 +42,24 @@ interface Particle {
   maxLife: number;
 }
 
+/** Chalk bag with a puff of powder rising off it. */
+const ChalkIcon = ({ className = '' }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    {/* powder in the air */}
+    <circle cx="6.6" cy="5.4" r="1.15" fill="currentColor" opacity=".55" />
+    <circle cx="17.4" cy="4.9" r=".95" fill="currentColor" opacity=".4" />
+    <circle cx="12" cy="3.3" r=".8" fill="currentColor" opacity=".3" />
+    {/* the bag */}
+    <path
+      d="M8 8h8l1.6 3.1a6 6 0 0 1-1.1 7A5 5 0 0 1 12 20a5 5 0 0 1-4.5-1.9 6 6 0 0 1-1.1-7L8 8Z"
+      stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"
+      fill="currentColor" fillOpacity=".18"
+    />
+    {/* drawstring */}
+    <path d="M7.1 10.6h9.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+  </svg>
+);
+
 export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
   settings,
   gameState,
@@ -503,6 +521,20 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
   }, [gameState, settings]);
 
   // Chalk restoring power-up
+  /**
+   * The on-screen chalk button. Space/Enter are unreachable on a phone, so the
+   * bag is also a tap target. It drives whichever climber this client controls;
+   * with no localPlayer (two people on one keyboard) the keys are the only sane
+   * way to tell the climbers apart, so the button drives player 1.
+   */
+  const chalkNow = () => {
+    if (!gameRunningRef.current) return;
+    const lp = localPlayerRef.current;
+    if (lp === 'spectator') return;
+    const target = lp === 'player2' ? p2Ref.current : p1Ref.current;
+    if (target) tryChalkUp(target);
+  };
+
   const tryChalkUp = (player: Climber) => {
     if (player.isFalling || player.hasFinished) return;
 
@@ -1761,6 +1793,10 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
     };
   }, [gameState, settings]);
 
+  // Chalk shown on the button belongs to whichever climber this client drives
+  const localChalk = localPlayer === 'player2' ? p2Chalk : p1Chalk;
+  const chalkReady = localChalk >= CHALK_REQUIRED;
+
   const isSolo = localPlayer === 'player1' || localPlayer === 'player2';
   const canvasWidth = (isSolo ? CANVAS_WIDTH / 2 : CANVAS_WIDTH) * ZOOM;
   // Hug the canvas (plus p-3 padding and the 1px border) so the frame doesn't
@@ -1827,7 +1863,8 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
         )}
       </div>
 
-      {/* Main Canvas Node */}
+      {/* Main Canvas Node — relative so the chalk button can sit on the wall */}
+      <div className="relative max-w-full">
       <canvas
         ref={canvasRef}
         width={canvasWidth}
@@ -1841,6 +1878,33 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
         className="block max-w-full h-auto touch-none select-none no-callout bg-slate-950 border border-slate-800 rounded-lg cursor-crosshair shadow-inner"
         id="gl-canvas-node"
       />
+
+      {/* Chalk button. Kept tappable even when the bag is short, because
+          tryChalkUp explains *why* it refused — a dead button teaches nothing.
+          onPointerDown rather than onClick so it fires the instant a thumb
+          lands, without the tap-to-click delay. */}
+      {localPlayer !== 'spectator' && (
+        <button
+          type="button"
+          id="chalk-button"
+          aria-label={`Chalk up — bag at ${localChalk}%`}
+          title={localChalk >= CHALK_REQUIRED ? 'Chalk up (or press Space)' : `Chalk bag at ${localChalk}% — needs ${CHALK_REQUIRED}%`}
+          onPointerDown={e => { e.preventDefault(); e.stopPropagation(); chalkNow(); }}
+          className={`absolute top-2 right-2 z-10 flex flex-col items-center justify-center
+            w-12 h-12 sm:w-14 sm:h-14 rounded-full border backdrop-blur-sm shadow-lg
+            select-none touch-none no-callout transition-all active:scale-90 cursor-pointer ${
+            chalkReady
+              ? 'bg-slate-900/80 border-sky-400/70 text-sky-200 hover:bg-slate-800/90'
+              : 'bg-slate-900/60 border-slate-700/70 text-slate-500'
+          }`}
+        >
+          <ChalkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+          <span className="font-mono font-bold text-[9px] sm:text-[10px] leading-none mt-0.5">
+            {localChalk}%
+          </span>
+        </button>
+      )}
+      </div>
 
       {/* Quick Game Help Controls Footer */}
       <div className="w-full flex flex-col sm:flex-row justify-between items-center gap-2 px-2 pt-2 text-[13px] text-slate-400 font-mono" id="control-cheats">
@@ -1860,7 +1924,11 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
           <span className="text-slate-600">↻ auto-cycles LH→RH→RF→LF</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-center">
-          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-bold">Space/Enter</span><span>Chalk</span>
+          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-bold">Space/Enter</span>
+          <span className="text-slate-600">or</span>
+          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-sky-300 border border-slate-700 font-bold inline-flex items-center gap-1">
+            <ChalkIcon className="w-3 h-3" />bag
+          </span><span>Chalk</span>
           <span className="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-slate-700 font-bold">2×tap body</span><span>Rock</span>
           <span className="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-slate-700 font-bold">Hold body 2s</span><span>Nail</span>
         </div>
