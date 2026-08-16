@@ -93,6 +93,160 @@ export const ROCK_SHAPE: { x: number; y: number }[] = [
   { x: -16, y:   4 },
 ];
 
+// ── Route shape ──────────────────────────────────────────────────────────────
+// 100px of wall is 1 metre. A route is one 200m block that never repeats inside
+// itself; anything taller simply stacks that block again.
+
+export const PX_PER_METRE = 100;
+export const SECTION_HEIGHT = 5 * PX_PER_METRE;        // the wall is tuned in 5m sections
+export const CLIMB_BLOCK_HEIGHT = 200 * PX_PER_METRE;  // 200m before the pattern repeats
+export const SECTIONS_PER_BLOCK = CLIMB_BLOCK_HEIGHT / SECTION_HEIGHT;
+
+/**
+ * Share of holds that are green jugs in the section starting at `index * 5m`:
+ * 90% down to a floor of 50%, five points per section. Green is the restful,
+ * nail-friendly hold, so this is what makes the wall bite the higher you get.
+ */
+export const sectionGreenShare = (index: number) => Math.max(0.5, 0.9 - 0.05 * index);
+
+/** Holds in that same section: 30 down to a floor of 10, two fewer each time. */
+export const sectionHoldCount = (index: number) => Math.max(10, 30 - 2 * index);
+
+interface Tuning {
+  crimp: number;
+  sloper: number;
+  volume: number;
+}
+
+// How the non-green share is split. Green is fixed by height, so difficulty only
+// decides what the rest of the wall is made of.
+const TUNING: Record<'easy' | 'medium' | 'hard', Tuning> = {
+  easy:   { crimp: 0.25, sloper: 0.25, volume: 0.50 },
+  medium: { crimp: 0.40, sloper: 0.40, volume: 0.20 },
+  hard:   { crimp: 0.50, sloper: 0.45, volume: 0.05 },
+};
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * One 200m block. Holds are laid out in rows rather than scattered, because the
+ * counts above get thin near the top and a climber has to be able to reach the
+ * next hold from the last one — each row is placed within arm's span of the row
+ * below it.
+ */
+function generateBlock(
+  rng: () => number,
+  canvasWidth: number,
+  difficulty: 'easy' | 'medium' | 'hard',
+): Hold[] {
+  const mix = TUNING[difficulty];
+  const holds: Hold[] = [];
+  const minX = 40;
+  const maxX = canvasWidth - 40;
+  const midX = (minX + maxX) / 2;
+
+  const addHold = (x: number, y: number, type: HoldType) => {
+    const size = type === 'volume' ? 36 + rng() * 12
+      : type === 'jug' ? 18 + rng() * 6
+      : type === 'sloper' ? 20 + rng() * 5
+      : 12 + rng() * 4;
+    holds.push({
+      id: `hold_${holds.length}_${Math.floor(rng() * 1000000)}`,
+      x, y, type,
+      color: getHoldColor(rng, type).color,
+      size,
+      shapePoints: generateBlobShape(rng, size, type),
+    });
+  };
+
+  // The green share is a promise, not a probability: a section of 26 holds at
+  // 80% gets exactly 21 jugs, shuffled through the rest rather than rolled per
+  // hold (which drifts far enough to make one section easier than the one below).
+  const sectionTypes = (count: number, greenShare: number): HoldType[] => {
+    const list: HoldType[] = [];
+    const jugs = Math.round(count * greenShare);
+    for (let i = 0; i < jugs; i++) list.push('jug');
+    while (list.length < count) {
+      const roll = rng() * (mix.crimp + mix.sloper + mix.volume);
+      list.push(roll < mix.crimp ? 'crimp' : roll < mix.crimp + mix.sloper ? 'sloper' : 'volume');
+    }
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [list[i], list[j]] = [list[j], list[i]];
+    }
+    return list;
+  };
+
+  // Where the previous row sat, so the next one stays within reach of it
+  let anchorX = midX;
+
+  for (let section = 0; section < SECTIONS_PER_BLOCK; section++) {
+    const count = sectionHoldCount(section);
+    const baseY = section * SECTION_HEIGHT;
+    const types = sectionTypes(count, sectionGreenShare(section));
+    let cursor = 0;
+    // Starting-shelf holds have to be jugs, so they take one out of the section's
+    // own green quota instead of being added on top of it.
+    const takeType = (forceJug: boolean): HoldType => {
+      if (forceJug) {
+        const swap = types.indexOf('jug', cursor);
+        if (swap >= 0) [types[cursor], types[swap]] = [types[swap], types[cursor]];
+        else types[cursor] = 'jug';
+      }
+      return types[cursor++];
+    };
+
+    // ~60px between rows, which is comfortably inside the 150px reach
+    const rows = Math.min(8, count);
+    const rowH = SECTION_HEIGHT / rows;
+
+    // Spread the section's holds over its rows, handing the remainder out at
+    // random so the extra hold isn't always on the same row of every section.
+    const perRow = Array.from({ length: rows }, () => Math.floor(count / rows));
+    const order = perRow.map((_, r) => r);
+    for (let i = order.length - 1; i > 0; i--) {          // Fisher-Yates
+      const j = Math.floor(rng() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    for (let extra = 0; extra < count % rows; extra++) perRow[order[extra]]++;
+
+    for (let r = 0; r < rows; r++) {
+      const k = perRow[r];
+      if (k === 0) continue;
+      const rowY = baseY + r * rowH + rowH * (0.3 + rng() * 0.4);
+
+      // The bottom of the wall is the starting shelf: full width, all jugs.
+      const isStart = rowY < 190;
+      const span = isStart ? maxX - minX : Math.max(200, k * 90);
+      const lo = clamp(anchorX - span / 2, minX, maxX - span);
+      const slot = span / k;
+
+      let sum = 0;
+      for (let i = 0; i < k; i++) {
+        // A few jitters per slot, keeping whichever sits furthest from its
+        // neighbours — planned rows still collide now and then.
+        let bestX = lo + slot * (i + 0.5);
+        let bestGap = -1;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const x = clamp(lo + slot * (i + 0.5) + (rng() - 0.5) * slot * 0.6, minX, maxX);
+          let gap = Infinity;
+          for (const h of holds) {
+            if (Math.abs(h.y - rowY) > 90) continue;
+            gap = Math.min(gap, Math.hypot(h.x - x, h.y - rowY));
+          }
+          if (gap > bestGap) { bestGap = gap; bestX = x; }
+          if (gap >= 48) break;
+        }
+        addHold(bestX, rowY, takeType(isStart));
+        sum += bestX;
+      }
+      anchorX = sum / k;
+    }
+  }
+
+  return holds;
+}
+
 export function generateHoldsForWall(
   wallHeight: number,
   canvasWidth: number,
@@ -100,116 +254,34 @@ export function generateHoldsForWall(
   seed: string
 ): Hold[] {
   const rng = createRandom(seed);
-  const holds: Hold[] = [];
-  
-  // Set parameters based on difficulty
-  let maxReach = 110;
-  let minDistance = 50;
-  let crimpProbability = 0.15;
-  let sloperProbability = 0.15;
-  let volumeProbability = 0.05;
-  
-  if (difficulty === 'easy') {
-    maxReach = 130;
-    minDistance = 45;
-    crimpProbability = 0.05;
-    sloperProbability = 0.05;
-    volumeProbability = 0.1;
-  } else if (difficulty === 'hard') {
-    maxReach = 95;
-    minDistance = 60;
-    crimpProbability = 0.35;
-    sloperProbability = 0.30;
-    volumeProbability = 0.02;
-  }
+  const block = generateBlock(rng, canvasWidth, difficulty);
+  const holds = block.filter(h => h.y < wallHeight - 140);
 
-  // Helper to add a hold with collision checking (don't overlap too closely)
-  function tryAddHold(x: number, y: number, type: HoldType): boolean {
-    // Keep padding from wall sides
-    if (x < 40 || x > canvasWidth - 40) return false;
-    
-    // Check overlapping
-    for (const hold of holds) {
-      const dx = hold.x - x;
-      const dy = hold.y - y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < minDistance) {
-        return false;
-      }
-    }
-    
-    const size = type === 'volume' ? 36 + rng() * 12 : type === 'jug' ? 18 + rng() * 6 : type === 'sloper' ? 20 + rng() * 5 : 12 + rng() * 4;
-    const colors = getHoldColor(rng, type);
-    
-    holds.push({
-      id: `hold_${holds.length}_${Math.floor(rng() * 1000000)}`,
-      x,
-      y,
-      type,
-      color: colors.color,
-      size,
-      shapePoints: generateBlobShape(rng, size, type),
-    });
-    
-    return true;
-  }
-
-  // --- 1. Generous Starting Layer (at the bottom, y is in gym height coords, where y=0 is ground and y=wallHeight is finish)
-  // Let's generate base shelf holds for feet and hands
-  for (let x = 60; x < canvasWidth - 40; x += 65) {
-    tryAddHold(x, 150 + (rng() * 30 - 15), 'jug'); // main starting holds
-    tryAddHold(x + 20, 50 + (rng() * 20), 'jug');  // standard low starter footholds
-  }
-
-  // --- 2. Iterative Reachable Generation Upwards
-  // We advance in bands from y = 150 up to wallHeight
-  let currentY = 150;
-  
-  while (currentY < wallHeight - 120) {
-    // Determine step size for next layer
-    const verticalStep = 60 + rng() * 35; // step up by roughly 60-95px
-    currentY += verticalStep;
-    
-    // In each vertical band, generate 2-4 holds across the width
-    const density = difficulty === 'hard' ? 2 : 3;
-    const sectorWidth = canvasWidth / density;
-    
-    for (let s = 0; s < density; s++) {
-      // Find coordinates in this sector
-      const sectorXStart = s * sectorWidth + 40;
-      const sectorXEnd = (s + 1) * sectorWidth - 40;
-      const hx = sectorXStart + rng() * (sectorXEnd - sectorXStart);
-      const hy = currentY + (rng() * 30 - 15);
-      
-      // Select hold type based on weights
-      const roll = rng();
-      let selectedType: HoldType = 'jug';
-      if (roll < crimpProbability) {
-        selectedType = 'crimp';
-      } else if (roll < crimpProbability + sloperProbability) {
-        selectedType = 'sloper';
-      } else if (roll < crimpProbability + sloperProbability + volumeProbability) {
-        selectedType = 'volume';
-      }
-      
-      tryAddHold(hx, hy, selectedType);
-    }
-    
-    // Ensure climbing paths don't get completely isolated dead ends.
-    // If there is any band with 0 holds, force spawn a secure Jug.
-    const holdsInBand = holds.filter(h => Math.abs(h.y - currentY) < 40);
-    if (holdsInBand.length === 0) {
-      tryAddHold(canvasWidth / 2 + (rng() * 100 - 50), currentY, 'jug');
+  // Past 200m the same block starts over — nobody has a clock long enough to
+  // get there, but the wall should not simply run out of holds if they do.
+  for (let tile = 1; tile * CLIMB_BLOCK_HEIGHT < wallHeight; tile++) {
+    const offset = tile * CLIMB_BLOCK_HEIGHT;
+    for (const h of block) {
+      if (h.y + offset >= wallHeight - 140) break;
+      holds.push({ ...h, id: `${h.id}_r${tile}`, y: h.y + offset });
     }
   }
 
-  // --- 3. Finish Ledge System at the top
-  // Create a beautiful heavy bar or giant chains at the top of the wall representing the top-out chain!
+  // Finish ledge: heavy volumes and jugs marking the top-out chain
   const finalTopY = wallHeight - 80;
-  // A set of giant blue/purple volumes or jugs
   for (let x = 80; x < canvasWidth - 40; x += 120) {
-    tryAddHold(x, finalTopY, 'volume');
-    tryAddHold(x + 40, finalTopY + 20, 'jug');
+    const size = 36 + rng() * 12;
+    holds.push({
+      id: `hold_top_${x}`, x, y: finalTopY, type: 'volume',
+      color: getHoldColor(rng, 'volume').color, size,
+      shapePoints: generateBlobShape(rng, size, 'volume'),
+    });
+    const jugSize = 18 + rng() * 6;
+    holds.push({
+      id: `hold_top_jug_${x}`, x: x + 40, y: finalTopY + 20, type: 'jug',
+      color: getHoldColor(rng, 'jug').color, size: jugSize,
+      shapePoints: generateBlobShape(rng, jugSize, 'jug'),
+    });
   }
 
   // Sort holds so they render from bottom to top nicely

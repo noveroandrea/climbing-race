@@ -6,6 +6,8 @@
 import React from 'react';
 import { Settings, Timer } from 'lucide-react';
 import { RoomSettings } from '../net';
+import { CLIMB_HEIGHT, climbById } from '../climbs';
+import { ClimbPicker } from './ClimbPicker';
 
 interface Props {
   settings: RoomSettings;
@@ -15,8 +17,12 @@ interface Props {
   className?: string;
 }
 
-export const randomSeed = () =>
-  `ROUTE_${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+/** Picking a wall settles the seed and the height too — they are not separate knobs. */
+export const settingsForClimb = (id: number): Partial<RoomSettings> => ({
+  climb: id,
+  seed: climbById(id).seed,
+  wallHeight: CLIMB_HEIGHT,
+});
 
 const GRADE_TONE: Record<RoomSettings['difficulty'], string> = {
   easy: 'text-emerald-300 border-emerald-500/30 bg-emerald-950/40',
@@ -46,7 +52,7 @@ export const RouteSummary: React.FC<{ settings: RoomSettings }> = ({ settings })
       </span>
     </div>
     <p className="mt-1.5 font-mono text-[11.5px] text-slate-500 truncate" title={settings.seed}>
-      {settings.seed}
+      Climb {settings.climb} · {climbById(settings.climb).name}
     </p>
   </div>
 );
@@ -88,26 +94,21 @@ export const RouteArchitecture: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Target height */}
+      {/* Which of the four walls */}
       <div>
         <div className="flex justify-between items-center mb-1.5 text-slate-400">
-          <label className="font-medium">Target Height</label>
+          <label className="font-medium">Wall</label>
           <span className="font-mono text-sky-400 font-bold">{settings.wallHeight / 100}m</span>
         </div>
-        <div className="grid grid-cols-4 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800/80">
-          {([1000, 2000, 3000, 4000] as const).map(h => (
-            <button
-              key={h}
-              disabled={!editable}
-              onClick={() => onChange({ wallHeight: h })}
-              className={`py-1 text-center font-bold tracking-tight rounded-lg text-[12.5px] transition-all cursor-pointer ${
-                settings.wallHeight === h ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed'
-              }`}
-            >
-              {h / 100}m
-            </button>
-          ))}
-        </div>
+        <ClimbPicker
+          compact
+          value={settings.climb}
+          disabled={!editable}
+          onPick={id => onChange(settingsForClimb(id))}
+        />
+        <p className="mt-1.5 text-[13px] text-slate-500 leading-snug">
+          Both climbers get the same wall. It sheds green holds every 5m — see “How to Climb”.
+        </p>
       </div>
 
       {/* Time limit */}
@@ -117,28 +118,6 @@ export const RouteArchitecture: React.FC<Props> = ({
           <span className="font-medium">Time Limit</span>
         </div>
         <span className="font-mono text-sky-400 font-bold">3:00</span>
-      </div>
-
-      {/* Seed */}
-      <div>
-        <div className="flex justify-between items-center mb-1">
-          <label className="text-slate-400 font-medium">Route Seed</label>
-          {editable && (
-            <button
-              onClick={() => onChange({ seed: randomSeed() })}
-              className="text-[13px] text-sky-400 hover:text-sky-300 transition-all font-semibold uppercase shrink-0"
-            >
-              Reseed
-            </button>
-          )}
-        </div>
-        <input
-          type="text"
-          value={settings.seed}
-          disabled={!editable}
-          onChange={e => onChange({ seed: e.target.value.replace(/\s+/g, '_').substring(0, 16) })}
-          className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700/60 rounded-xl px-3 py-1.5 font-mono text-[15.5px] text-sky-300 tracking-wide font-bold outline-none focus:border-sky-500 uppercase disabled:opacity-60 disabled:cursor-not-allowed"
-        />
       </div>
     </div>
   </div>

@@ -3,17 +3,40 @@
 A climbing game with a solo time-attack mode and a two-player online race.
 Static frontend on GitHub Pages, data and realtime on Supabase — no server to run.
 
+## The four walls
+
+The gym has four routes (`src/climbs.ts`), picked with buttons before a solo run
+and on the create-game form for a race. They are all **200m tall and never repeat
+inside those 200m** — past the top the same block simply stacks again, which no
+clock in the game is long enough to reach.
+
+Every wall gets harder with height, in 5m sections:
+
+| Section | Green jugs | Holds |
+|---|---|---|
+| 0–5m | 90% | 30 |
+| 5–10m | 85% | 28 |
+| 10–15m | 80% | 26 |
+| … | −5% per section | −2 per section |
+| 50m and up | 50% (floor) | 10 (floor) |
+
+Green jugs are the restful holds — the only ones you recover stamina on and the
+only ones you can hammer a nail from — so thinning them out is what makes the
+route bite. The shares are exact, not a dice roll per hold: a 26-hold section at
+80% gets 21 jugs. `sectionGreenShare` / `sectionHoldCount` in `src/utils.ts` are
+the single source of truth, and the in-app ramp card reads from them.
+
 ## Modes
 
-**Single Player** — a fixed route (medium, 20m, seed `SOLO_FIXED_01`) with **120
-seconds** on the clock. Ends when you top out or time runs out; your score is the
-height in metres you reached, saved to the leaderboard under a name you enter.
-A name owns one record: a run only goes on the board if it beats what that name
-already holds, and a weaker one is reported back ("previous record 12m, this run
-7m") instead of being written. The board shows one line per climber, their best.
+**Single Player** — pick a wall, **120 seconds** on the clock. Ends when you top
+out or time runs out; your score is the height in metres you reached, saved under
+a name you enter. **Each wall keeps its own Hall of Fame**, and a name owns one
+record per wall: a run only goes on the board if it beats what that name already
+holds there, and a weaker one is reported back ("previous record 12m, this run
+7m") instead of being written. Each board shows one line per climber, their best.
 
-**Create / Join Game** — the host picks a game ID (e.g. `GYM1234`) and sets the
-route; the other climber opens the same page and joins with that ID. A shared
+**Create / Join Game** — the host picks a game ID (e.g. `GYM1234`), a wall and a
+grade; the other climber opens the same page and joins with that ID. A shared
 10-second countdown, then a 3-minute race. First to top out wins; if the clock
 runs out, the higher climber wins.
 
@@ -33,6 +56,22 @@ instructions rewrite themselves — `useIsTouch` (`src/lib/useIsTouch.ts`) watch
 than guessing from the window width.
 
 ---
+
+## Database migration
+
+The four walls need one column that older databases do not have:
+
+```sql
+alter table public.scores add column if not exists climb smallint not null default 1;
+```
+
+The default is what puts every score saved before the walls existed onto Climb 1,
+where they were in fact climbed. `supabase/schema.sql` has this plus the check
+constraint, the index, and the seed rows that open walls 2–4 with a few names on
+them; paste the whole file into the SQL editor — it is written to be re-runnable.
+
+Until it is run, the app does not break: `net.ts` probes for the column once and,
+when it is missing, reads and writes without it and shows every score on Climb 1.
 
 ## How the multiplayer works without a server
 

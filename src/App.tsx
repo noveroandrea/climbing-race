@@ -8,7 +8,7 @@ import { GameSettings, SerializedClimberState, FinalHeights } from './types';
 import { ClimbingCanvas } from './components/ClimbingCanvas';
 import { InstructionsModal } from './components/InstructionsModal';
 import { QuickGuide } from './components/InstructionsContent';
-import { RouteArchitecture, RouteSummary, randomSeed } from './components/RouteArchitecture';
+import { RouteArchitecture, RouteSummary } from './components/RouteArchitecture';
 import { QuickStart } from './components/QuickStart';
 import { useIsTouch, usePointerWords } from './lib/useIsTouch';
 import { motion } from 'motion/react';
@@ -34,26 +34,26 @@ import {
 import * as net from './net';
 import type { Role, RoomState, RoomSettings, JoinAck } from './net';
 import { isConfigured } from './lib/supabase';
+import { CLIMBS, CLIMB_HEIGHT, climbById } from './climbs';
+import { ClimbPicker, ClimbRamp } from './components/ClimbPicker';
 
-/** One line of scores.txt, as served by GET /api/scores. */
-interface ScoreEntry {
-  name: string;
-  meters: number;
-  date: string;
-}
+type ScoreEntry = net.ScoreEntry;
 
-type Screen = 'menu' | 'create' | 'join' | 'lobby' | 'countdown' | 'playing' | 'finished';
+type Screen = 'menu' | 'climb-select' | 'create' | 'join' | 'lobby' | 'countdown' | 'playing' | 'finished';
 type Mode = 'single' | 'multi';
 
-/** Solo mode is always the same route, so scores on the board are comparable. */
-const SOLO_SETTINGS: GameSettings = {
-  wallHeight: 2000,
+/**
+ * Solo runs are always medium and always 2:00 — the wall is the only variable,
+ * which is what keeps each climb's board comparable within itself.
+ */
+const soloSettings = (climb: number): GameSettings => ({
+  wallHeight: CLIMB_HEIGHT,
   difficulty: 'medium',
   mode: 'split',
   gravity: 0.45,
-  seed: 'SOLO_FIXED_01',
+  seed: climbById(climb).seed,
   timeLimitMs: 120000, // 2 minutes
-};
+});
 
 const randomGameId = () => `GYM${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -93,11 +93,10 @@ export default function App() {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Route picked on the create-game form, before a room exists to push it to.
-  const [draftSettings, setDraftSettings] = useState<RoomSettings>({
-    wallHeight: 2000,
-    difficulty: 'medium',
-    seed: 'BETA_CLIMB_32',
-  });
+  const [draftSettings, setDraftSettings] = useState<RoomSettings>(net.DEFAULT_SETTINGS);
+  // Which of the four walls a solo run is on, and which board is on screen.
+  const [climbId, setClimbId] = useState(1);
+  const [boardClimb, setBoardClimb] = useState(1);
   const [role, setRole] = useState<Role | null>(null);
   const [room, setRoom] = useState<RoomState | null>(null);
   const [copied, setCopied] = useState(false);
@@ -237,17 +236,27 @@ export default function App() {
   // ClimbingCanvas re-initialises the route whenever this object's identity changes,
   // and App re-renders ~20x/second from remote-state — so it has to be memoised.
   const multiSettings = useMemo<GameSettings>(() => ({
-    wallHeight: room?.settings.wallHeight ?? 2000,
+    wallHeight: room?.settings.wallHeight ?? CLIMB_HEIGHT,
     difficulty: room?.settings.difficulty ?? 'medium',
     mode: 'split',
     gravity: 0.45,
-    seed: room?.settings.seed ?? 'BETA_CLIMB_32',
+    seed: room?.settings.seed ?? climbById(1).seed,
   }), [room?.settings.wallHeight, room?.settings.difficulty, room?.settings.seed]);
-  const activeSettings = mode === 'single' ? SOLO_SETTINGS : multiSettings;
+  const soloGameSettings = useMemo<GameSettings>(() => soloSettings(climbId), [climbId]);
+  const activeSettings = mode === 'single' ? soloGameSettings : multiSettings;
 
   // ── Menu actions ──────────────────────────────────────────────────────────
-  const startSinglePlayer = () => {
+  // Solo goes through the wall picker first; the board follows whatever is picked.
+  const openClimbSelect = () => {
     setMode('single');
+    setBoardClimb(climbId);
+    setScreen('climb-select');
+  };
+
+  const startSinglePlayer = (climb: number) => {
+    setMode('single');
+    setClimbId(climb);
+    setBoardClimb(climb);
     setRole(null);
     setWinner(null);
     setSoloMeters(0);
@@ -261,7 +270,6 @@ export default function App() {
     setMode('multi');
     setJoinError(null);
     setGameIdInput(randomGameId());
-    setDraftSettings(s => ({ ...s, seed: randomSeed() }));
     setScreen('create');
   };
 
@@ -364,7 +372,7 @@ export default function App() {
   const saveSoloScore = async () => {
     const name = nameEntryValue.trim() || 'Anonymous';
     setSaving(true);
-    const result = await net.submitScore(name, soloMeters);
+    const result = await net.submitScore(name, soloMeters, climbId);
     setScores(result.scores); // keeps the board visible even if the save failed
     setMyName(name);
     setSaving(false);
@@ -385,28 +393,51 @@ export default function App() {
   // sliced to a top-N. `fullHeight` is the left-column variant: it sticks to the
   // viewport and runs the whole height of the screen. Elsewhere the card is
   // capped at 70vh so it cannot push the rest of the page off-screen.
-  const Leaderboard = ({ fullHeight = false }: { fullHeight?: boolean }) => (
+  const Leaderboard = ({ fullHeight = false }: { fullHeight?: boolean }) => {
+    // A score only means something next to runs on the same wall, so each climb
+    // gets its own board and the tabs pick which one is on screen.
+    const shown = scores.filter(s => s.climb === boardClimb);
+    return (
     <div
       className={`bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl w-full flex flex-col ${
         fullHeight ? 'lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] max-h-[70vh] lg:max-h-none' : 'max-h-[70vh]'
       }`}
     >
-      <div className="flex items-center gap-1.5 mb-2.5 pb-2 border-b border-slate-800 shrink-0">
+      <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-slate-800 shrink-0">
         <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
         <span className="text-[13px] font-mono tracking-wider uppercase font-extrabold text-slate-400">
           Solo Hall of Fame
         </span>
         <span className="ml-auto text-[11.5px] font-mono text-slate-600">
-          {scores.length > 0 ? `${scores.length} climbers` : 'metres climbed'}
+          {shown.length > 0 ? `${shown.length} climbers` : 'metres climbed'}
         </span>
       </div>
+
+      <div className="grid grid-cols-4 gap-1 p-1 mb-2.5 bg-slate-950 rounded-xl border border-slate-800/80 shrink-0">
+        {CLIMBS.map(c => (
+          <button
+            key={c.id}
+            onClick={() => setBoardClimb(c.id)}
+            title={c.name}
+            className={`py-1 rounded-lg text-[11.5px] font-mono font-bold tracking-tight transition-all cursor-pointer ${
+              boardClimb === c.id ? 'bg-amber-600/80 text-white shadow' : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            #{c.id}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11.5px] font-mono text-slate-500 mb-2 truncate shrink-0">
+        {climbById(boardClimb).name}
+      </p>
+
       {/* min-h-0 lets this flex child shrink below its content height, which is
           what actually makes the overflow scroll rather than stretch the card. */}
       <div className="space-y-1.5 text-[15.5px] font-mono overflow-y-auto min-h-0 flex-1 pr-1 board-scroll">
-        {scores.length === 0 ? (
-          <span className="text-slate-500 text-[13.5px]">No records yet — climb a solo route.</span>
+        {shown.length === 0 ? (
+          <span className="text-slate-500 text-[13.5px]">No records yet — climb this wall and put one up.</span>
         ) : (
-          scores.map((rec, i) => (
+          shown.map((rec, i) => (
             <div key={`${rec.name}-${rec.date}-${i}`} className="flex justify-between items-center text-slate-300 gap-2">
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className="text-slate-500 font-bold shrink-0">#{i + 1}</span>
@@ -421,7 +452,8 @@ export default function App() {
         )}
       </div>
     </div>
-  );
+    );
+  };
 
   const inMatch = screen === 'playing' || screen === 'finished' || screen === 'lobby' || screen === 'countdown';
   // Solo runs are on a fixed route, so there is nothing to configure — and with
@@ -535,12 +567,12 @@ export default function App() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 relative">
               <button
-                onClick={startSinglePlayer}
+                onClick={openClimbSelect}
                 className="group flex flex-col items-center gap-2 p-5 rounded-2xl bg-slate-950/70 border border-emerald-500/25 hover:border-emerald-400/60 hover:bg-emerald-950/30 transition-all active:scale-95 cursor-pointer"
               >
                 <User className="w-7 h-7 text-emerald-400" />
                 <span className="font-bold text-[18px] text-white font-sans">Single Player</span>
-                <span className="text-[13.5px] text-slate-400 text-center leading-snug">Fixed route, 2:00 on the clock. Score = metres climbed.</span>
+                <span className="text-[13.5px] text-slate-400 text-center leading-snug">Pick one of four walls, 2:00 on the clock. Score = metres climbed.</span>
               </button>
 
               <button
@@ -569,6 +601,46 @@ export default function App() {
                 Online play and the leaderboard need VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.
               </p>
             )}
+          </motion.div>
+
+          <Leaderboard />
+        </main>
+      )}
+
+      {/* ══ CLIMB PICKER (solo) ══════════════════════════════════════════════ */}
+      {screen === 'climb-select' && (
+        <main className="flex-1 w-full max-w-3xl mx-auto p-6 flex flex-col gap-6">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-slate-900 border border-slate-800/80 shadow-2xl rounded-2xl p-6 sm:p-8"
+          >
+            <div className="text-center mb-6">
+              <h2 className="text-[26px] sm:text-[31px] font-bold font-sans tracking-tight text-white mb-1.5">
+                Which wall?
+              </h2>
+              <p className="text-slate-400 text-[15.5px] sm:text-[18px] font-sans">
+                Four routes, 200m each, 2:00 on the clock. Every wall keeps its own Hall of Fame.
+              </p>
+            </div>
+
+            {/* Picking a wall swings the Hall of Fame below over to it too */}
+            <ClimbPicker
+              value={climbId}
+              onPick={id => { setClimbId(id); setBoardClimb(id); }}
+            />
+
+            <div className="mt-4">
+              <ClimbRamp />
+            </div>
+
+            <button
+              onClick={() => startSinglePlayer(climbId)}
+              className="mt-5 w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer font-sans text-[18px]"
+            >
+              <Play className="w-5 h-5" />
+              <span>Climb {climbById(climbId).name}</span>
+            </button>
           </motion.div>
 
           <Leaderboard />
@@ -691,7 +763,7 @@ export default function App() {
 
             {/* The route is chosen on the create form, so once the room exists
                 this is just a reminder of what everyone is climbing. */}
-            {showRouteArch && <RouteSummary settings={activeSettings} />}
+            {showRouteArch && <RouteSummary settings={room?.settings ?? draftSettings} />}
 
             {showLeaderboard && <Leaderboard fullHeight />}
           </section>
@@ -843,7 +915,7 @@ export default function App() {
                   {soloToppedOut ? 'Route Topped Out!' : "Time's Up!"}
                 </h2>
                 <p className="text-[15.5px] uppercase font-mono tracking-wider font-extrabold text-sky-400 mb-6">
-                  Solo run · fixed route · 2:00
+                  Climb {climbId} · {climbById(climbId).name} · 2:00
                 </p>
 
                 <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-8 w-full max-w-md mb-6">
@@ -853,11 +925,17 @@ export default function App() {
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md font-sans">
                   <button
-                    onClick={startSinglePlayer}
+                    onClick={() => startSinglePlayer(climbId)}
                     className="flex-1 py-3 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
                   >
                     <RotateCcw className="w-4 h-4" />
                     <span>Climb Again</span>
+                  </button>
+                  <button
+                    onClick={openClimbSelect}
+                    className="py-3 px-5 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 text-slate-300 rounded-xl font-semibold transition-all cursor-pointer"
+                  >
+                    Change Wall
                   </button>
                   <button
                     onClick={backToMenu}
@@ -1070,7 +1148,8 @@ export default function App() {
                   {soloMeters}m climbed
                 </h2>
                 <p className="text-slate-400 text-[18px] mb-6 font-sans">
-                  Enter your name for the Hall of Fame. One record per name — this only replaces yours if it is higher.
+                  Your name for the <strong className="text-slate-300">{climbById(climbId).name}</strong> board.
+                  One record per name on each wall — this only replaces yours if it is higher.
                 </p>
                 <input
                   type="text"

@@ -19,6 +19,7 @@
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, isConfigured } from './lib/supabase';
+import { CLIMB_HEIGHT, climbById } from './climbs';
 
 export type Role = 'p1' | 'p2';
 
@@ -26,7 +27,17 @@ export interface RoomSettings {
   wallHeight: number;
   difficulty: 'easy' | 'medium' | 'hard';
   seed: string;
+  /** Which of the four gym walls (see src/climbs.ts). */
+  climb: number;
 }
+
+/** What a room opened before the four walls existed was climbing. */
+export const DEFAULT_SETTINGS: RoomSettings = {
+  wallHeight: CLIMB_HEIGHT,
+  difficulty: 'medium',
+  seed: climbById(1).seed,
+  climb: 1,
+};
 
 export interface PlayerSlot {
   name: string;
@@ -109,7 +120,8 @@ function toRoomState(row: RoomRow): RoomState {
   return {
     id: row.id,
     phase: row.phase,
-    settings: row.settings,
+    // A room opened before the four walls existed has no `climb` in its settings
+    settings: { ...row.settings, climb: row.settings?.climb ?? 1 },
     p1: { name: row.p1_name, connected: row.p1_present },
     p2: { name: row.p2_name, connected: row.p2_present },
     result: row.result,
@@ -251,7 +263,7 @@ export async function createGame(
       p1_present: true,
       p2_name: 'Player 2',
       p2_present: false,
-      settings: settings ?? { wallHeight: 2000, difficulty: 'medium', seed: 'BETA_CLIMB_32' },
+      settings: settings ?? DEFAULT_SETTINGS,
     })
     .select()
     .single();
@@ -351,7 +363,7 @@ export async function returnLobby() {
     .upsert({
       id: myGameId,
       phase: 'lobby',
-      settings: prev?.settings ?? { wallHeight: 2000, difficulty: 'medium', seed: 'BETA_CLIMB_32' },
+      settings: prev?.settings ?? DEFAULT_SETTINGS,
       p1_name: prev?.p1_name ?? 'Player 1',
       p1_present: true,
       // Keep the guest in their seat, so the host can start again immediately
@@ -406,6 +418,8 @@ export interface ScoreEntry {
   name: string;
   meters: number;
   date: string;
+  /** Which wall it was climbed on. Rows saved before the four walls existed are 1. */
+  climb: number;
 }
 
 const asDate = (iso: string) => {
@@ -414,36 +428,50 @@ const asDate = (iso: string) => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-/** Two entries belong to the same climber if the names differ only in case. */
-const nameKey = (name: string) => name.trim().toLowerCase();
+/** One record per climber per wall, so the same name can hold four of them. */
+const recordKey = (r: { name: string; climb: number }) =>
+  `${r.climb}:${r.name.trim().toLowerCase()}`;
 
-// The board is one line per climber: their personal record. Older rows for the
-// same name are left in the table (there is no delete policy on `scores`, and
-// they are harmless history) but never shown twice.
+// The board is one line per climber: their personal record on that wall. Older
+// rows for the same name are left in the table (there is no delete policy on
+// `scores`, and they are harmless history) but never shown twice.
 function bestPerClimber(rows: ScoreEntry[]): ScoreEntry[] {
   const seen = new Set<string>();
   return rows.filter(r => {
-    const key = nameKey(r.name);
+    const key = recordKey(r);
     if (seen.has(key)) return false; // rows arrive best-first, so this is the record
     seen.add(key);
     return true;
   });
 }
 
+/**
+ * `scores.climb` arrived with the four walls. Until the migration in
+ * `supabase/schema.sql` has been run the column is simply not there, and asking
+ * for it fails the whole query — so ask once and remember, rather than losing
+ * the board entirely on a database that is one migration behind.
+ */
+let climbColumn: Promise<boolean> | null = null;
+const hasClimbColumn = (): Promise<boolean> =>
+  (climbColumn ??= Promise.resolve(supabase.from('scores').select('climb').limit(1))
+    .then(({ error }) => !error));
+
 // The board scrolls, so it shows every climber rather than a top-N slice. The
 // cap is just a runaway guard — PostgREST would refuse anything over its own
 // max-rows anyway.
 export async function fetchScores(limit = 500): Promise<ScoreEntry[]> {
   if (!isConfigured) return [];
+  const columns = (await hasClimbColumn()) ? 'name, meters, created_at, climb' : 'name, meters, created_at';
   const { data, error } = await supabase
     .from('scores')
-    .select('name, meters, created_at')
+    .select(columns)
     .order('meters', { ascending: false })
     .order('created_at', { ascending: true })
     .limit(limit);
   if (error || !data) return [];
   return bestPerClimber(
-    data.map(r => ({ name: r.name, meters: r.meters, date: asDate(r.created_at) })),
+    (data as unknown as { name: string; meters: number; created_at: string; climb?: number }[])
+      .map(r => ({ name: r.name, meters: r.meters, date: asDate(r.created_at), climb: r.climb ?? 1 })),
   );
 }
 
@@ -456,23 +484,29 @@ export interface SoloSaveResult {
 }
 
 /**
- * A name owns one record, so a run only lands on the board if it beats what that
- * name already holds. A weaker run is reported back and thrown away — writing it
- * would either bury the record under a worse row or, worse, overwrite it.
+ * A name owns one record per wall, so a run only lands on the board if it beats
+ * what that name already holds *on that climb*. A weaker run is reported back
+ * and thrown away — writing it would bury the record under a worse row.
  */
-export async function submitScore(rawName: string, rawMeters: number): Promise<SoloSaveResult> {
+export async function submitScore(
+  rawName: string,
+  rawMeters: number,
+  climb: number,
+): Promise<SoloSaveResult> {
   const name = cleanName(rawName) || 'Anonymous';
   const meters = Math.max(0, Math.floor(rawMeters));
   if (!isConfigured) return { scores: [], previous: null, improved: false };
 
   const board = await fetchScores();
-  const held = board.find(r => nameKey(r.name) === nameKey(name));
+  const held = board.find(r => recordKey(r) === recordKey({ name, climb }));
   const previous = held ? held.meters : null;
   const improved = previous === null || meters > previous;
 
   if (!improved) return { scores: board, previous, improved };
 
-  const { error } = await supabase.from('scores').insert({ name, meters });
+  const row: Record<string, unknown> = { name, meters };
+  if (await hasClimbColumn()) row.climb = climb;
+  const { error } = await supabase.from('scores').insert(row);
   // A failed write must not be announced as a new record
   if (error) return { scores: board, previous, improved: false };
   return { scores: await fetchScores(), previous, improved: true };

@@ -7,11 +7,12 @@
 -- trade for a toy game with no accounts. Do not put anything private in here.
 
 -- ── Solo leaderboard ─────────────────────────────────────────────────────────
--- One row per record-setting run. The board is one line per climber, and a run
--- that does not beat that name's standing record is never inserted — the client
--- checks first (see submitScore in src/net.ts) and collapses the rest on read.
--- There is deliberately no unique constraint on `name`: anon has no update or
--- delete policy here, so a unique index would just make repeat saves fail.
+-- One row per record-setting run. The board is one line per climber per wall,
+-- and a run that does not beat that name's standing record on that wall is
+-- never inserted — the client checks first (see submitScore in src/net.ts) and
+-- collapses the rest on read. There is deliberately no unique constraint on
+-- (name, climb): anon has no update or delete policy here, so a unique index
+-- would just make repeat saves fail.
 
 create table if not exists public.scores (
   id         bigint generated always as identity primary key,
@@ -20,8 +21,47 @@ create table if not exists public.scores (
   created_at timestamptz not null default now()
 );
 
+-- Which of the four gym walls the run was on. Everything saved before the walls
+-- existed was climbed on wall 1, which is exactly what the default backfills.
+alter table public.scores
+  add column if not exists climb smallint not null default 1;
+
+do $$ begin
+  alter table public.scores add constraint scores_climb_range check (climb between 1 and 4);
+exception when duplicate_object then null;
+end $$;
+
 -- The board is always read best-first
 create index if not exists scores_meters_idx on public.scores (meters desc, created_at asc);
+create index if not exists scores_climb_idx on public.scores (climb, meters desc);
+
+-- Walls 2-4 open with a few names on them so the boards are not blank. Guarded
+-- so re-running this file does not stack up another set.
+insert into public.scores (name, meters, climb, created_at)
+select * from (values
+  ('Milo', 0, 2, '2026-06-08T19:05:00Z'::timestamptz),
+  ('Zora', 9, 2, '2026-07-02T12:05:00Z'::timestamptz),
+  ('Pia', 8, 2, '2026-06-10T15:18:00Z'::timestamptz),
+  ('Noor', 8, 2, '2026-06-19T13:18:00Z'::timestamptz),
+  ('Emre', 1, 2, '2026-06-12T10:12:00Z'::timestamptz),
+  ('Bram', 9, 2, '2026-06-20T12:56:00Z'::timestamptz),
+  ('Femke', 10, 2, '2026-07-25T14:56:00Z'::timestamptz),
+  ('Iris', 9, 3, '2026-07-12T13:27:00Z'::timestamptz),
+  ('Aksel', 2, 3, '2026-06-03T18:33:00Z'::timestamptz),
+  ('Ines', 8, 3, '2026-07-29T14:56:00Z'::timestamptz),
+  ('Jae', 4, 3, '2026-06-04T17:49:00Z'::timestamptz),
+  ('Sana', 2, 3, '2026-07-05T16:49:00Z'::timestamptz),
+  ('Nika', 0, 3, '2026-06-25T17:41:00Z'::timestamptz),
+  ('Otto', 5, 3, '2026-07-20T16:56:00Z'::timestamptz),
+  ('Kofi', 1, 4, '2026-06-09T16:12:00Z'::timestamptz),
+  ('Ruben', 0, 4, '2026-07-21T18:56:00Z'::timestamptz),
+  ('Hana', 4, 4, '2026-07-29T19:41:00Z'::timestamptz),
+  ('Tobias', 0, 4, '2026-07-12T11:12:00Z'::timestamptz),
+  ('Lucia', 7, 4, '2026-06-07T21:33:00Z'::timestamptz),
+  ('Alba', 2, 4, '2026-06-13T15:56:00Z'::timestamptz),
+  ('Vera', 1, 4, '2026-06-15T15:33:00Z'::timestamptz)
+) as seed(name, meters, climb, created_at)
+where not exists (select 1 from public.scores where climb > 1);
 
 alter table public.scores enable row level security;
 
