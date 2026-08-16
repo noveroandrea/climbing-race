@@ -7,6 +7,11 @@
 -- trade for a toy game with no accounts. Do not put anything private in here.
 
 -- ── Solo leaderboard ─────────────────────────────────────────────────────────
+-- One row per record-setting run. The board is one line per climber, and a run
+-- that does not beat that name's standing record is never inserted — the client
+-- checks first (see submitScore in src/net.ts) and collapses the rest on read.
+-- There is deliberately no unique constraint on `name`: anon has no update or
+-- delete policy here, so a unique index would just make repeat saves fail.
 
 create table if not exists public.scores (
   id         bigint generated always as identity primary key,

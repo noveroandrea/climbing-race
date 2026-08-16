@@ -414,7 +414,23 @@ const asDate = (iso: string) => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-// The board scrolls, so it shows every saved run rather than a top-N slice. The
+/** Two entries belong to the same climber if the names differ only in case. */
+const nameKey = (name: string) => name.trim().toLowerCase();
+
+// The board is one line per climber: their personal record. Older rows for the
+// same name are left in the table (there is no delete policy on `scores`, and
+// they are harmless history) but never shown twice.
+function bestPerClimber(rows: ScoreEntry[]): ScoreEntry[] {
+  const seen = new Set<string>();
+  return rows.filter(r => {
+    const key = nameKey(r.name);
+    if (seen.has(key)) return false; // rows arrive best-first, so this is the record
+    seen.add(key);
+    return true;
+  });
+}
+
+// The board scrolls, so it shows every climber rather than a top-N slice. The
 // cap is just a runaway guard — PostgREST would refuse anything over its own
 // max-rows anyway.
 export async function fetchScores(limit = 500): Promise<ScoreEntry[]> {
@@ -426,12 +442,38 @@ export async function fetchScores(limit = 500): Promise<ScoreEntry[]> {
     .order('created_at', { ascending: true })
     .limit(limit);
   if (error || !data) return [];
-  return data.map(r => ({ name: r.name, meters: r.meters, date: asDate(r.created_at) }));
+  return bestPerClimber(
+    data.map(r => ({ name: r.name, meters: r.meters, date: asDate(r.created_at) })),
+  );
 }
 
-export async function submitScore(rawName: string, meters: number): Promise<ScoreEntry[]> {
-  if (!isConfigured) return [];
+export interface SoloSaveResult {
+  scores: ScoreEntry[];
+  /** What this climber already held, or null if the board had never seen them. */
+  previous: number | null;
+  /** Whether the run beat that and was written to the board. */
+  improved: boolean;
+}
+
+/**
+ * A name owns one record, so a run only lands on the board if it beats what that
+ * name already holds. A weaker run is reported back and thrown away — writing it
+ * would either bury the record under a worse row or, worse, overwrite it.
+ */
+export async function submitScore(rawName: string, rawMeters: number): Promise<SoloSaveResult> {
   const name = cleanName(rawName) || 'Anonymous';
-  await supabase.from('scores').insert({ name, meters: Math.max(0, Math.floor(meters)) });
-  return fetchScores();
+  const meters = Math.max(0, Math.floor(rawMeters));
+  if (!isConfigured) return { scores: [], previous: null, improved: false };
+
+  const board = await fetchScores();
+  const held = board.find(r => nameKey(r.name) === nameKey(name));
+  const previous = held ? held.meters : null;
+  const improved = previous === null || meters > previous;
+
+  if (!improved) return { scores: board, previous, improved };
+
+  const { error } = await supabase.from('scores').insert({ name, meters });
+  // A failed write must not be announced as a new record
+  if (error) return { scores: board, previous, improved: false };
+  return { scores: await fetchScores(), previous, improved: true };
 }

@@ -8,6 +8,9 @@ Static frontend on GitHub Pages, data and realtime on Supabase — no server to 
 **Single Player** — a fixed route (medium, 20m, seed `SOLO_FIXED_01`) with **120
 seconds** on the clock. Ends when you top out or time runs out; your score is the
 height in metres you reached, saved to the leaderboard under a name you enter.
+A name owns one record: a run only goes on the board if it beats what that name
+already holds, and a weaker one is reported back ("previous record 12m, this run
+7m") instead of being written. The board shows one line per climber, their best.
 
 **Create / Join Game** — the host picks a game ID (e.g. `GYM1234`) and sets the
 route; the other climber opens the same page and joins with that ID. A shared

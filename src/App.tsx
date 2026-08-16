@@ -134,6 +134,9 @@ export default function App() {
   const [showNameEntry, setShowNameEntry] = useState(false);
   const [nameEntryValue, setNameEntryValue] = useState('');
   const [saving, setSaving] = useState(false);
+  // How the run measured up to the record this name already held. Set once the
+  // save comes back; it turns the name prompt into the verdict.
+  const [saveResult, setSaveResult] = useState<net.SoloSaveResult | null>(null);
 
   const loadScores = useCallback(async () => {
     // The board is optional — an unreachable backend just shows an empty list
@@ -344,6 +347,7 @@ export default function App() {
       setWinReason(reason);
       setNameEntryValue(myNameRef.current);
       setScreen('finished');
+      setSaveResult(null);
       setShowNameEntry(true);
       return;
     }
@@ -360,10 +364,16 @@ export default function App() {
   const saveSoloScore = async () => {
     const name = nameEntryValue.trim() || 'Anonymous';
     setSaving(true);
-    setScores(await net.submitScore(name, soloMeters)); // keeps the run visible even if the save failed
+    const result = await net.submitScore(name, soloMeters);
+    setScores(result.scores); // keeps the board visible even if the save failed
     setMyName(name);
     setSaving(false);
+    setSaveResult(result); // the modal now reports how it went instead of closing
+  };
+
+  const closeNameEntry = () => {
     setShowNameEntry(false);
+    setSaveResult(null);
   };
 
   // ── Small shared bits ─────────────────────────────────────────────────────
@@ -387,7 +397,7 @@ export default function App() {
           Solo Hall of Fame
         </span>
         <span className="ml-auto text-[11.5px] font-mono text-slate-600">
-          {scores.length > 0 ? `${scores.length} runs` : 'metres climbed'}
+          {scores.length > 0 ? `${scores.length} climbers` : 'metres climbed'}
         </span>
       </div>
       {/* min-h-0 lets this flex child shrink below its content height, which is
@@ -987,35 +997,105 @@ export default function App() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className="bg-slate-900 border border-amber-500/40 rounded-2xl p-8 max-w-sm w-full shadow-2xl text-center"
           >
-            <div className="bg-amber-500/15 p-4 rounded-full border border-amber-500/30 inline-flex mb-4">
-              <Sparkles className="w-10 h-10 text-amber-400" />
-            </div>
-            <h2 className="text-[26px] font-black text-white mb-1 font-sans">
-              {soloMeters}m climbed
-            </h2>
-            <p className="text-slate-400 text-[18px] mb-6 font-sans">Enter your name for the Hall of Fame.</p>
-            <input
-              type="text"
-              value={nameEntryValue}
-              onChange={e => setNameEntryValue(e.target.value.substring(0, 20))}
-              onKeyDown={e => { if (e.key === 'Enter') saveSoloScore(); }}
-              placeholder="Your name…"
-              autoFocus
-              className="w-full bg-slate-950 border border-amber-500/40 focus:border-amber-400 rounded-xl px-4 py-3 text-white font-bold text-center text-[23.5px] outline-none mb-4 font-sans"
-            />
-            <button
-              disabled={saving}
-              onClick={saveSoloScore}
-              className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-60 active:scale-95 text-white font-bold rounded-xl transition-all cursor-pointer font-sans"
-            >
-              {saving ? 'Saving…' : 'Save to Hall of Fame'}
-            </button>
-            <button
-              onClick={() => setShowNameEntry(false)}
-              className="mt-2 w-full py-2 text-slate-500 hover:text-slate-300 text-[18px] transition-all cursor-pointer"
-            >
-              Skip
-            </button>
+            {saveResult ? (
+              /* The name already owned a record, so the run is measured against it
+                 rather than silently piling up a second line on the board. */
+              <>
+                <div
+                  className={`p-4 rounded-full border inline-flex mb-4 ${
+                    saveResult.improved
+                      ? 'bg-emerald-500/15 border-emerald-500/30'
+                      : 'bg-slate-800 border-slate-700'
+                  }`}
+                >
+                  {saveResult.improved
+                    ? <Trophy className="w-10 h-10 text-emerald-400" />
+                    : <Info className="w-10 h-10 text-slate-400" />}
+                </div>
+
+                {saveResult.improved && saveResult.previous === null && (
+                  <>
+                    <h2 className="text-[26px] font-black text-emerald-300 mb-2 font-sans">Record set!</h2>
+                    <p className="text-slate-400 text-[18px] font-sans">
+                      <strong className="text-white">{soloMeters}m</strong> goes on the board as your first record.
+                    </p>
+                  </>
+                )}
+
+                {saveResult.improved && saveResult.previous !== null && (
+                  <>
+                    <h2 className="text-[26px] font-black text-emerald-300 mb-2 font-sans">
+                      Congratulations — you improved your record!
+                    </h2>
+                    <p className="text-slate-400 text-[18px] font-sans">
+                      Previous record <strong className="text-slate-300">{saveResult.previous}m</strong> →{' '}
+                      <strong className="text-emerald-300">{soloMeters}m</strong>.
+                    </p>
+                  </>
+                )}
+
+                {!saveResult.improved && saveResult.previous !== null && (
+                  <>
+                    <h2 className="text-[26px] font-black text-white mb-2 font-sans">Your record stands</h2>
+                    <p className="text-slate-400 text-[18px] font-sans">
+                      Previous record is <strong className="text-sky-300">{saveResult.previous}m</strong>, this run is{' '}
+                      <strong className="text-slate-300">{soloMeters}m</strong>. The board keeps your best.
+                    </p>
+                  </>
+                )}
+
+                {!saveResult.improved && saveResult.previous === null && (
+                  <>
+                    <h2 className="text-[26px] font-black text-white mb-2 font-sans">Could not save</h2>
+                    <p className="text-slate-400 text-[18px] font-sans">
+                      The Hall of Fame is unreachable right now — your {soloMeters}m did not make it onto the board.
+                    </p>
+                  </>
+                )}
+
+                <button
+                  autoFocus
+                  onClick={closeNameEntry}
+                  className="mt-6 w-full py-3 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 text-slate-200 font-bold rounded-xl transition-all cursor-pointer font-sans"
+                >
+                  Got it
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="bg-amber-500/15 p-4 rounded-full border border-amber-500/30 inline-flex mb-4">
+                  <Sparkles className="w-10 h-10 text-amber-400" />
+                </div>
+                <h2 className="text-[26px] font-black text-white mb-1 font-sans">
+                  {soloMeters}m climbed
+                </h2>
+                <p className="text-slate-400 text-[18px] mb-6 font-sans">
+                  Enter your name for the Hall of Fame. One record per name — this only replaces yours if it is higher.
+                </p>
+                <input
+                  type="text"
+                  value={nameEntryValue}
+                  onChange={e => setNameEntryValue(e.target.value.substring(0, 20))}
+                  onKeyDown={e => { if (e.key === 'Enter') saveSoloScore(); }}
+                  placeholder="Your name…"
+                  autoFocus
+                  className="w-full bg-slate-950 border border-amber-500/40 focus:border-amber-400 rounded-xl px-4 py-3 text-white font-bold text-center text-[23.5px] outline-none mb-4 font-sans"
+                />
+                <button
+                  disabled={saving}
+                  onClick={saveSoloScore}
+                  className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-60 active:scale-95 text-white font-bold rounded-xl transition-all cursor-pointer font-sans"
+                >
+                  {saving ? 'Saving…' : 'Save to Hall of Fame'}
+                </button>
+                <button
+                  onClick={closeNameEntry}
+                  className="mt-2 w-full py-2 text-slate-500 hover:text-slate-300 text-[18px] transition-all cursor-pointer"
+                >
+                  Skip
+                </button>
+              </>
+            )}
           </motion.div>
         </div>
       )}
