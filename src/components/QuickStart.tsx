@@ -5,40 +5,25 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { Hammer, MousePointerClick, Pointer, Sparkles, Mountain } from 'lucide-react';
+import { MousePointerClick, Pointer } from 'lucide-react';
+import { HoldSwatch } from './HoldSwatch';
 import { useIsTouch, usePointerWords } from '../lib/useIsTouch';
 
-const STORAGE_KEY = 'gripRace.quickStartDismissed';
-
 /**
- * Whether the quick-start card should still be on the menu. Read once at mount —
- * a stored "yes" survives reloads, so the card is a first-visit thing, not a
- * banner you dismiss forever every time.
- */
-export function useQuickStart(): [boolean, () => void] {
-  const [show, setShow] = React.useState(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY) !== '1';
-    } catch {
-      return true; // private mode / storage blocked — showing it is the safe miss
-    }
-  });
-
-  const dismiss = () => {
-    setShow(false);
-    try { localStorage.setItem(STORAGE_KEY, '1'); } catch { /* nothing to do */ }
-  };
-
-  return [show, dismiss];
-}
-
-/**
- * The four-line version of the rules, on the menu above "Pick your climb".
- * Anything longer lives behind "How to Climb" in the header.
+ * The short version of the rules, on the menu above "Pick your climb". Shown on
+ * every visit — "I got it" only folds it away for this session, because the
+ * controls are not the sort of thing you remember between climbs.
  */
 export const QuickStart: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) => {
   const touch = useIsTouch();
   const w = usePointerWords();
+
+  const moves: [string, React.ReactNode][] = [
+    [w.tap, <>a hold to move the selected limb there. {w.tap} a hand or foot to select a different one.</>],
+    [w.doubleTap, <>your body for a new rock above your head — but you <strong className="text-rose-300">fall while placing it</strong>.</>],
+    [w.hold, <>on your body for 2s to hammer a nail. Future falls stop there instead of the ground.</>],
+    [`${w.tap} the chalk bag`, <>(top right of the wall) to chalk your hands — your grip then drains half as fast.</>],
+  ];
 
   return (
     <motion.div
@@ -52,38 +37,58 @@ export const QuickStart: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) =
         {touch
           ? <Pointer className="w-5 h-5 text-sky-400 shrink-0" />
           : <MousePointerClick className="w-5 h-5 text-sky-400 shrink-0" />}
-        <h2 className="text-[20px] sm:text-[23.5px] font-bold font-sans tracking-tight text-white">
-          How to play
-        </h2>
+        <h2 className="text-[20px] sm:text-[23.5px] font-bold font-sans tracking-tight text-white">How to play</h2>
         <span className="ml-auto text-[11.5px] font-mono uppercase tracking-wider text-sky-400/80 border border-sky-500/25 rounded px-1.5 py-0.5">
           {touch ? 'touch' : 'mouse'}
         </span>
       </div>
 
-      <ul className="relative space-y-2 text-[14.5px] sm:text-[15.5px] text-slate-300 font-sans leading-snug">
-        <li className="flex gap-2.5">
-          <Mountain className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-          <span>
-            <strong className="text-white">{w.tap} a hand or foot</strong>, then {w.taps} a highlighted hold to
-            move it there. Climb to the top before the clock runs out.
-          </span>
-        </li>
-        <li className="flex gap-2.5">
-          <Hammer className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-          <span>
-            <strong className="text-amber-200">{w.hold} on your body for 2 seconds</strong>{' '}
-            with all four limbs on green jugs to hammer a nail — it catches your next fall. Forget it and you drop
-            all the way down.
-          </span>
-        </li>
-        <li className="flex gap-2.5">
-          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-          <span>
-            <strong className="text-white">Chalk up</strong> with the bag button on the top right of the wall
-            {touch ? '' : ' (or the Space key)'} to slow your grip drain.
-          </span>
-        </li>
+      {/* What you do */}
+      <ul className="relative space-y-1.5 text-[14.5px] sm:text-[15.5px] text-slate-300 font-sans leading-snug">
+        {moves.map(([verb, rest], i) => (
+          <li key={i} className="flex gap-2">
+            <span className="text-sky-500/60 shrink-0">•</span>
+            <span><strong className="text-white">{verb}</strong> {rest}</span>
+          </li>
+        ))}
       </ul>
+
+      {/* The green holds */}
+      <div className="relative mt-3 flex items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-950/25 px-3 py-2">
+        <HoldSwatch kind="jug" size="sm" />
+        <p className="text-[14px] sm:text-[14.5px] text-slate-300 leading-snug">
+          <strong className="text-emerald-300">Green jugs are the safe holds</strong> — solid, barely tiring, and the
+          only ones you can hammer a nail from (all four limbs on green).
+        </p>
+      </div>
+
+      {/* The two bars above the climber's head */}
+      <div className="relative mt-3 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5">
+        <p className="text-[12.5px] uppercase tracking-wider font-bold text-slate-500 font-sans mb-2">
+          The bars above your climber
+        </p>
+        <div className="space-y-2 text-[14px] sm:text-[14.5px] text-slate-300 leading-snug font-sans">
+          <div className="flex items-center gap-2.5">
+            <span className="w-11 h-2 rounded-sm bg-slate-800 overflow-hidden shrink-0">
+              <span className="block h-full w-2/3 bg-emerald-500" />
+            </span>
+            <span>
+              <strong className="text-white">Stamina</strong> — green, then{' '}
+              <span className="text-amber-400">amber</span>, then <span className="text-rose-400">red</span>. At zero
+              you fall. Resting both hands on green jugs winds it back up.
+            </span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="w-11 h-1.5 rounded-sm bg-slate-800 overflow-hidden shrink-0">
+              <span className="block h-full w-full bg-white" />
+            </span>
+            <span>
+              <strong className="text-white">Chalk</strong> — the thin one. Refills as you hang; it has to be full
+              before you can chalk up, and one dip empties it.
+            </span>
+          </div>
+        </div>
+      </div>
 
       <button
         onClick={onDismiss}

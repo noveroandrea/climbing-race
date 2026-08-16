@@ -9,7 +9,7 @@ import { ClimbingCanvas } from './components/ClimbingCanvas';
 import { InstructionsModal } from './components/InstructionsModal';
 import { QuickGuide } from './components/InstructionsContent';
 import { RouteArchitecture, RouteSummary, randomSeed } from './components/RouteArchitecture';
-import { QuickStart, useQuickStart } from './components/QuickStart';
+import { QuickStart } from './components/QuickStart';
 import { useIsTouch, usePointerWords } from './lib/useIsTouch';
 import { motion } from 'motion/react';
 import {
@@ -81,7 +81,8 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('menu');
   const [mode, setMode] = useState<Mode>('single');
   const [showInstructions, setShowInstructions] = useState(false);
-  const [showQuickStart, dismissQuickStart] = useQuickStart();
+  // Back every visit, not just the first — folded away for this session only.
+  const [showQuickStart, setShowQuickStart] = useState(true);
   const isTouch = useIsTouch();
   const pointer = usePointerWords();
   const [resetCount, setResetCount] = useState(0);
@@ -497,7 +498,7 @@ export default function App() {
       {/* ══ MENU ═════════════════════════════════════════════════════════════ */}
       {screen === 'menu' && (
         <main className="flex-1 w-full max-w-3xl mx-auto p-6 flex flex-col gap-6">
-          {showQuickStart && <QuickStart onDismiss={dismissQuickStart} />}
+          {showQuickStart && <QuickStart onDismiss={() => setShowQuickStart(false)} />}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
