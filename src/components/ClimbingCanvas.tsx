@@ -1755,16 +1755,16 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
 
   return (
     <div
-      className="flex flex-col items-center bg-slate-900 rounded-xl overflow-hidden p-3 border border-slate-700/60 shadow-xl max-w-full"
+      className="flex flex-col items-center bg-slate-900 rounded-xl overflow-hidden p-1.5 sm:p-3 border border-slate-700/60 shadow-xl max-w-full"
       style={{ width: frameWidth }}
       id="climb-screen-frame"
     >
       {/* Realtime Stats Header Board */}
-      <div className="w-full flex items-center justify-between px-3 py-1 bg-slate-950/70 rounded-lg mb-2 text-[15.5px] font-mono select-none" id="stats-ribbon">
+      <div className="w-full flex items-center justify-between gap-1 px-1.5 sm:px-3 py-1 bg-slate-950/70 rounded-lg mb-2 text-[11px] sm:text-[13px] md:text-[15.5px] font-mono select-none" id="stats-ribbon">
         {localPlayer !== 'player2' && (
-          <div className="flex items-center gap-3">
-            <span className="text-emerald-400 font-bold">P1 - {p1Name}</span>
-            <div className="w-16 h-2 md:w-24 bg-slate-800 rounded-full overflow-hidden">
+          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 min-w-0">
+            <span className="text-emerald-400 font-bold truncate max-w-[72px] sm:max-w-none">P1 - {p1Name}</span>
+            <div className="w-8 sm:w-16 md:w-24 h-2 bg-slate-800 rounded-full overflow-hidden shrink-0">
               <div className="h-full bg-emerald-500 transition-all duration-100" style={{ width: `${p1Stamina}%` }} />
             </div>
             <span className="text-slate-500">
@@ -1779,15 +1779,15 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
         )}
 
         {/* Central countdown */}
-        <div className="flex flex-col items-center leading-none">
-          <span className={`font-bold text-[18px] ${timeRemaining < 30000 ? 'text-red-400 animate-pulse' : timeRemaining < 60000 ? 'text-amber-400' : 'text-sky-400'}`}>
+        <div className="flex flex-col items-center leading-none shrink-0">
+          <span className={`font-bold text-[15px] sm:text-[18px] ${timeRemaining < 30000 ? 'text-red-400 animate-pulse' : timeRemaining < 60000 ? 'text-amber-400' : 'text-sky-400'}`}>
             {Math.floor(timeRemaining / 60000)}:{Math.floor((timeRemaining % 60000) / 1000).toString().padStart(2, '0')}
           </span>
-          <span className="text-[11.5px] text-slate-500 uppercase tracking-wider">Time Left</span>
+          <span className="text-[9px] sm:text-[11.5px] text-slate-500 uppercase tracking-wider">Time Left</span>
         </div>
 
         {localPlayer !== 'player1' && (
-          <div className="flex items-center gap-3 text-right">
+          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 text-right min-w-0">
             <span className="text-slate-400">{(p2DisplayTime / 1000).toFixed(1)}s</span>
             <span className="text-slate-500">
               CHALK <span className={`font-bold ${p2Chalk >= CHALK_REQUIRED ? 'text-white' : 'text-slate-400'}`}>{p2Chalk}%</span>
@@ -1796,10 +1796,10 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
               H <span className="text-slate-200 font-bold">{p2Height}m</span>
               <span className="text-slate-600">/{WALL_HEIGHT / 100}m</span>
             </span>
-            <div className="w-16 h-2 md:w-24 bg-slate-800 rounded-full overflow-hidden">
+            <div className="w-8 sm:w-16 md:w-24 h-2 bg-slate-800 rounded-full overflow-hidden shrink-0">
               <div className="h-full bg-red-500 transition-all duration-100" style={{ width: `${p2Stamina}%` }} />
             </div>
-            <span className="text-red-400 font-bold">{p2Name} - P2</span>
+            <span className="text-red-400 font-bold truncate max-w-[72px] sm:max-w-none">{p2Name} - P2</span>
           </div>
         )}
       </div>
@@ -1818,7 +1818,13 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
         ref={canvasRef}
         width={canvasWidth}
         height={VIEW_HEIGHT}
-        className="bg-slate-950 border border-slate-800 rounded-lg cursor-crosshair shadow-inner"
+        /* The width/height attributes stay at full resolution — they are the
+           drawing buffer, so the wall keeps its detail on a high-DPI phone.
+           max-w-full/h-auto only shrink the *displayed* size, letting a narrow
+           screen scale the whole wall down instead of clipping it. Pointer
+           coords are already normalised by rect.width/rect.height, so clicks
+           stay accurate at any display size. */
+        className="block max-w-full h-auto touch-none bg-slate-950 border border-slate-800 rounded-lg cursor-crosshair shadow-inner"
         id="gl-canvas-node"
       />
 
