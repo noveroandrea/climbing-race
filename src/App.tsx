@@ -368,20 +368,32 @@ export default function App() {
     <span className={`inline-block w-2 h-2 rounded-full ${on ? 'bg-emerald-400' : 'bg-slate-600'}`} />
   );
 
-  const Leaderboard = ({ compact = false }: { compact?: boolean }) => (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl w-full">
-      <div className="flex items-center gap-1.5 mb-2.5 pb-2 border-b border-slate-800">
+  // Every saved run is listed; the list scrolls inside the card instead of being
+  // sliced to a top-N. `fullHeight` is the left-column variant: it sticks to the
+  // viewport and runs the whole height of the screen. Elsewhere the card is
+  // capped at 70vh so it cannot push the rest of the page off-screen.
+  const Leaderboard = ({ fullHeight = false }: { fullHeight?: boolean }) => (
+    <div
+      className={`bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl w-full flex flex-col ${
+        fullHeight ? 'lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] max-h-[70vh] lg:max-h-none' : 'max-h-[70vh]'
+      }`}
+    >
+      <div className="flex items-center gap-1.5 mb-2.5 pb-2 border-b border-slate-800 shrink-0">
         <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
         <span className="text-[13px] font-mono tracking-wider uppercase font-extrabold text-slate-400">
           Solo Hall of Fame
         </span>
-        <span className="ml-auto text-[11.5px] font-mono text-slate-600">metres climbed</span>
+        <span className="ml-auto text-[11.5px] font-mono text-slate-600">
+          {scores.length > 0 ? `${scores.length} runs` : 'metres climbed'}
+        </span>
       </div>
-      <div className="space-y-1.5 text-[15.5px] font-mono">
+      {/* min-h-0 lets this flex child shrink below its content height, which is
+          what actually makes the overflow scroll rather than stretch the card. */}
+      <div className="space-y-1.5 text-[15.5px] font-mono overflow-y-auto min-h-0 flex-1 pr-1 board-scroll">
         {scores.length === 0 ? (
           <span className="text-slate-500 text-[13.5px]">No records yet — climb a solo route.</span>
         ) : (
-          scores.slice(0, compact ? 5 : 10).map((rec, i) => (
+          scores.map((rec, i) => (
             <div key={`${rec.name}-${rec.date}-${i}`} className="flex justify-between items-center text-slate-300 gap-2">
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className="text-slate-500 font-bold shrink-0">#{i + 1}</span>
@@ -726,7 +738,7 @@ export default function App() {
             </div>
             )}
 
-            {showLeaderboard && <Leaderboard compact />}
+            {showLeaderboard && <Leaderboard fullHeight />}
           </section>
           )}
 

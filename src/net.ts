@@ -373,7 +373,10 @@ const asDate = (iso: string) => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-export async function fetchScores(limit = 20): Promise<ScoreEntry[]> {
+// The board scrolls, so it shows every saved run rather than a top-N slice. The
+// cap is just a runaway guard — PostgREST would refuse anything over its own
+// max-rows anyway.
+export async function fetchScores(limit = 500): Promise<ScoreEntry[]> {
   if (!isConfigured) return [];
   const { data, error } = await supabase
     .from('scores')
