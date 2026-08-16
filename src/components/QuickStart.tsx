@@ -22,7 +22,9 @@ export const QuickStart: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) =
     [w.tap, <>a hold to move the selected limb there. {w.tap} a hand or foot to select a different one.</>],
     [w.doubleTap, <>your body for a new rock above your head — but you <strong className="text-rose-300">fall while placing it</strong>.</>],
     [w.hold, <>on your body for 2s to hammer a nail. Future falls stop there instead of the ground.</>],
-    [`${w.tap} the chalk bag`, <>(top right of the wall) to chalk your hands — your grip then drains half as fast.</>],
+    [`${w.tap} the chalk bag`, <>(top right of the wall) to make your energy last: for{' '}
+      <strong className="text-sky-300">5 seconds your stamina drains 55% slower</strong>. It does not refill the bar —
+      only resting on green jugs does that.</>],
   ];
 
   return (
@@ -83,8 +85,8 @@ export const QuickStart: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) =
               <span className="block h-full w-full bg-white" />
             </span>
             <span>
-              <strong className="text-white">Chalk</strong> — the thin one. Refills as you hang; it has to be full
-              before you can chalk up, and one dip empties it.
+              <strong className="text-white">Chalk</strong> — the thin one. It has to be full before you can chalk up
+              and one dip empties it, so you get a dip roughly every 23s of hanging steady.
             </span>
           </div>
         </div>

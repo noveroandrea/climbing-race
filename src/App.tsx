@@ -967,8 +967,8 @@ export default function App() {
                 <div>
                   <span className="font-semibold text-slate-300 block">Pro Climbing Tactics:</span>
                   {pointer.tap} a limb to select it, then {pointer.taps} a reachable hold to move it there. Chalk up with{' '}
-                  {isTouch ? 'the bag button on the wall' : 'Space'} to restore grip, and keep feet on holds to save
-                  stamina — campusing drains you fast!
+                  {isTouch ? 'the bag button on the wall' : 'Space'} to slow your stamina drain for 5s, and keep feet on
+                  holds to save stamina — campusing drains you fast!
                 </div>
               </div>
             )}

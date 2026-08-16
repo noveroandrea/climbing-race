@@ -88,8 +88,9 @@ export const QuickGuide: React.FC = () => {
       <div className="flex gap-2 py-1.5">
         <dt className="shrink-0 w-24 font-mono text-[12.5px] text-sky-400 pt-px">{touch ? 'BAG BUTTON' : 'SPACE · BAG'}</dt>
         <dd className="text-slate-400">
-          Chalk — {touch ? 'the bag button on the top right of the wall' : 'the key, or the bag button on the top right of the wall'}. Needs{' '}
-          <strong className="text-slate-200">70%</strong>, drains <strong className="text-slate-200">70%</strong>.
+          Chalk — {touch ? 'the bag button on the top right of the wall' : 'the key, or the bag button on the top right of the wall'}.
+          Stamina drains <strong className="text-slate-200">55% slower for 5s</strong>. Needs{' '}
+          <strong className="text-slate-200">70%</strong> in the bag, drains <strong className="text-slate-200">70%</strong>.
         </dd>
       </div>
       <div className="flex gap-2 py-1.5">
@@ -214,8 +215,9 @@ export const InstructionsContent: React.FC = () => {
               <><kbd className="px-1 text-slate-100 bg-slate-800 rounded font-mono text-[13px]">Space</kbd> — or by clicking the </>
             )}
             <strong className="text-sky-300">chalk bag button on the top right of the wall</strong>
-            {touch ? '' : ', which is the way to do it on a phone'} — to halve your grip drain for 5 seconds and claw
-            back some stamina.{' '}
+            {touch ? '' : ', which is the way to do it on a phone'} — to make your energy last:{' '}
+            <strong className="text-sky-300">stamina drains 55% slower for 5 seconds</strong>. It does not refill the
+            stamina bar; only resting both hands on green jugs does that.{' '}
             <strong className="text-sky-300">Your chalk must be at 70% to use it, and one use drains 70%</strong> —
             leaving the bag empty. It refills slowly (~3%/s) only while you hang steady with your feet on the wall,
             so you get one dip roughly every 23 seconds. Spend it wisely.
