@@ -1,0 +1,6 @@
+{
+  "name": "Two-Player Climbing Gym Race",
+  "description": "An interactive local multiplayer racing game where two players climb randomly generated climbing gym walls on split-screens using WASD and Arrow controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

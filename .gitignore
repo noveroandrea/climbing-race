@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output
+build/
+dist/
+dist-ssr/
+*.local
+
+# Secrets — real values live in .env.local, only the template is committed
+.env*
+!.env.example
+
+# Test / tooling
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Editors & OS
+.claude/
+.vscode/
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
