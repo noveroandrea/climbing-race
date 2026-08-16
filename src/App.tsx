@@ -424,16 +424,20 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased selection:bg-sky-500/30 selection:text-sky-200" id="gym-app-root">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40 px-6 py-3.5 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-tr from-sky-500 to-emerald-500 p-2 rounded-xl shadow-lg border border-sky-400/20">
-            <Activity className="w-5 h-5 text-white animate-pulse" />
+      {/* Compact below sm: on a phone the full-size header ate a third of the
+          screen and the wrapped title/button labels pushed the wall's timer
+          ribbon out of view. Labels collapse to their icons; the buttons keep
+          aria-labels so they stay meaningful without visible text. */}
+      <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40 gap-2 px-2.5 py-1.5 sm:px-6 sm:py-3.5 flex justify-between items-center">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+          <div className="bg-gradient-to-tr from-sky-500 to-emerald-500 p-1 sm:p-2 rounded-lg sm:rounded-xl shadow-lg border border-sky-400/20 shrink-0">
+            <Activity className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-white animate-pulse" />
           </div>
-          <div>
-            <h1 className="text-[23.5px] font-bold font-sans tracking-tight bg-gradient-to-r from-slate-100 via-slate-200 to-sky-400 bg-clip-text text-transparent">
+          <div className="min-w-0">
+            <h1 className="text-[15px] sm:text-[23.5px] leading-tight whitespace-nowrap font-bold font-sans tracking-tight bg-gradient-to-r from-slate-100 via-slate-200 to-sky-400 bg-clip-text text-transparent">
               Grip &amp; Race
             </h1>
-            <p className="text-[13px] uppercase font-mono tracking-wider font-semibold text-sky-400">
+            <p className="text-[9.5px] sm:text-[13px] leading-tight uppercase font-mono tracking-wider font-semibold text-sky-400 truncate">
               {screen === 'menu' ? 'Main Menu'
                 : mode === 'single' ? '🧗 Solo Run — 2:00'
                 : isHost ? `🟢 Host · Game ${room?.id ?? ''}` : `🔴 Guest · Game ${room?.id ?? ''}`}
@@ -441,7 +445,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {inMatch && mode === 'multi' && (
             <div className="hidden sm:flex items-center gap-2 text-[13px] font-mono">
               <span className="flex items-center gap-1"><Dot on={p1Connected} /><span className="text-slate-400">{p1Name}</span></span>
@@ -454,33 +458,36 @@ export default function App() {
           {screen === 'playing' && mode === 'multi' && isHost && (
             <button
               onClick={() => void net.returnLobby()}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-950/50 hover:bg-amber-900/50 border border-amber-500/40 rounded-lg text-[15.5px] font-medium text-amber-200 transition-all cursor-pointer"
+              aria-label="Stop race"
+              className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 bg-amber-950/50 hover:bg-amber-900/50 border border-amber-500/40 rounded-lg text-[13px] sm:text-[15.5px] font-medium text-amber-200 transition-all cursor-pointer"
             >
-              <Timer className="w-3.5 h-3.5 text-amber-400" />
-              <span>Stop Race</span>
+              <Timer className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="hidden sm:inline">Stop Race</span>
             </button>
           )}
           {screen !== 'menu' && (
             <button
               onClick={backToMenu}
-              className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-[15.5px] font-medium transition-all cursor-pointer ${
+              aria-label={inMatch ? 'Exit game' : 'Back to menu'}
+              className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 border rounded-lg text-[13px] sm:text-[15.5px] font-medium transition-all cursor-pointer ${
                 screen === 'playing'
                   ? 'bg-rose-950/60 hover:bg-rose-900/60 border-rose-500/40 text-rose-200'
                   : 'bg-slate-800 hover:bg-slate-700/80 border-slate-700 text-slate-300'
               }`}
             >
               {screen === 'playing'
-                ? <LogOut className="w-3.5 h-3.5 text-rose-400" />
-                : <ArrowLeft className="w-3.5 h-3.5 text-sky-400" />}
-              <span>{inMatch ? 'Exit Game' : 'Menu'}</span>
+                ? <LogOut className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                : <ArrowLeft className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
+              <span className="hidden sm:inline">{inMatch ? 'Exit Game' : 'Menu'}</span>
             </button>
           )}
           <button
             onClick={() => setShowInstructions(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 rounded-lg text-[15.5px] font-medium text-slate-300 transition-all cursor-pointer"
+            aria-label="How to climb"
+            className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 rounded-lg text-[13px] sm:text-[15.5px] font-medium text-slate-300 transition-all cursor-pointer"
           >
-            <HelpCircle className="w-3.5 h-3.5 text-sky-400" />
-            <span>How to Climb</span>
+            <HelpCircle className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+            <span className="hidden sm:inline">How to Climb</span>
           </button>
         </div>
       </header>
