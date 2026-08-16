@@ -1727,24 +1727,61 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
           const elapsed = now - bpDraw.startTime;
           const prog = Math.min(1, elapsed / NAIL_HOLD_MS);
 
+          // The finger doing the holding sits directly on the climber and covers
+          // roughly 50 wall units across, so this whole indicator is drawn well
+          // outside that — a ring the size of the old one was completely hidden
+          // under the fingertip on a phone.
+          const RING_R = 92;
+          const RING_W = 9;
+          const HAMMER_SCALE = 2.6;
+
           // Progress ring around the climber
-          ctx.strokeStyle = 'rgba(251, 191, 36, 0.35)';
-          ctx.lineWidth = 4;
+          ctx.strokeStyle = 'rgba(251, 191, 36, 0.28)';
+          ctx.lineWidth = RING_W;
           ctx.beginPath();
-          ctx.arc(scrTorsoX, scrTorsoY, 30, 0, Math.PI * 2);
+          ctx.arc(scrTorsoX, scrTorsoY, RING_R, 0, Math.PI * 2);
           ctx.stroke();
+          ctx.save();
           ctx.strokeStyle = '#fbbf24';
-          ctx.lineWidth = 4;
+          ctx.lineWidth = RING_W;
+          ctx.lineCap = 'round';
           ctx.beginPath();
-          ctx.arc(scrTorsoX, scrTorsoY, 30, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2);
+          ctx.arc(scrTorsoX, scrTorsoY, RING_R, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2);
           ctx.stroke();
+          ctx.restore();
+
+          // A halo that starts pulsing on the home straight, so the hold reads as
+          // "nearly there" from the corner of your eye
+          if (prog > 0.5) {
+            ctx.strokeStyle = `rgba(253, 230, 138, ${0.18 + 0.22 * Math.abs(Math.sin(now / 110))})`;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(scrTorsoX, scrTorsoY, RING_R + 14, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          // Countdown above the ring — clear of the hand entirely
+          ctx.save();
+          ctx.textAlign = 'center';
+          ctx.font = 'bold 13px monospace';
+          ctx.fillStyle = 'rgba(251, 191, 36, 0.8)';
+          ctx.fillText('HOLD FOR NAIL', scrTorsoX, scrTorsoY - RING_R - 40);
+          ctx.font = 'bold 30px monospace';
+          ctx.fillStyle = '#fde68a';
+          ctx.fillText(
+            prog >= 1 ? 'NAIL!' : `${(Math.max(0, NAIL_HOLD_MS - elapsed) / 1000).toFixed(1)}s`,
+            scrTorsoX, scrTorsoY - RING_R - 12,
+          );
+          ctx.restore();
 
           // Hammer swing — only between NAIL_ANIM_START_MS and NAIL_HOLD_MS
           if (elapsed >= NAIL_ANIM_START_MS) {
             const swing = Math.abs(Math.sin((elapsed - NAIL_ANIM_START_MS) / 70));
             ctx.save();
-            ctx.translate(scrTorsoX + 12, scrTorsoY - 6);
+            // Pushed out to the edge of the ring so the swing is not under the thumb
+            ctx.translate(scrTorsoX + RING_R * 0.55, scrTorsoY - 16);
             ctx.rotate(-1.5 + swing * 1.2); // raise & smash
+            ctx.scale(HAMMER_SCALE, HAMMER_SCALE);
             ctx.strokeStyle = pl.color;
             ctx.lineWidth = 4;
             ctx.lineCap = 'round';
@@ -1767,10 +1804,14 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
             // impact spark at the bottom of the swing
             if (swing < 0.12) {
               ctx.fillStyle = '#fde68a';
-              for (let s = 0; s < 4; s++) {
-                const a = (s / 4) * Math.PI * 2;
+              for (let s = 0; s < 7; s++) {
+                const a = (s / 7) * Math.PI * 2;
                 ctx.beginPath();
-                ctx.arc(scrTorsoX + 18 + Math.cos(a) * 5, scrTorsoY + 6 + Math.sin(a) * 5, 1.5, 0, Math.PI * 2);
+                ctx.arc(
+                  scrTorsoX + RING_R * 0.55 + Math.cos(a) * 14,
+                  scrTorsoY + 12 + Math.sin(a) * 14,
+                  3.5, 0, Math.PI * 2,
+                );
                 ctx.fill();
               }
             }
