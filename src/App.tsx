@@ -617,7 +617,7 @@ export default function App() {
 
           {/* ── Left column ────────────────────────────────────────────────── */}
           {showLeftColumn && (
-          <section className="lg:col-span-1 space-y-5">
+          <section className="lg:col-span-1 space-y-5 min-w-0">
 
             {/* Game ID card (multiplayer only) */}
             {showRoomCard && room && (
@@ -743,7 +743,9 @@ export default function App() {
           )}
 
           {/* ── Right column ───────────────────────────────────────────────── */}
-          <section className={`${showLeftColumn ? 'lg:col-span-3' : 'lg:col-span-4'} space-y-4`}>
+          {/* min-w-0: a grid item defaults to min-width:auto, which would let the
+              wall's intrinsic width push this track wider than the viewport. */}
+          <section className={`${showLeftColumn ? 'lg:col-span-3' : 'lg:col-span-4'} space-y-4 min-w-0`}>
 
             {/* The other climber bailed out of a live round */}
             {abandonMsg && screen === 'lobby' && (
@@ -979,8 +981,11 @@ export default function App() {
 
             {/* PLAYING — wall on the left, briefing filling the space on the right */}
             {screen === 'playing' && (
-              <div className="animate-fade-in flex flex-col xl:flex-row gap-4 items-start">
-                <div className="relative shrink-0">
+              <div className="animate-fade-in flex flex-col xl:flex-row gap-4 items-stretch xl:items-start min-w-0">
+                {/* Below xl this is a column: it must span the viewport width so the
+                    wall can scale down into it. Only from xl (side-by-side with the
+                    briefing) does it hug the canvas at its natural size. */}
+                <div className="relative w-full min-w-0 xl:w-auto xl:shrink-0">
                 <ClimbingCanvas
                   settings={activeSettings}
                   gameState="playing"
