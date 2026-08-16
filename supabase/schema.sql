@@ -1,4 +1,4 @@
--- Grip & Race — Supabase schema
+-- Climbing Race — Supabase schema
 -- Run this once in the Supabase dashboard: SQL Editor → New query → paste → Run.
 --
 -- The game has no login. Everything below is reachable by the anonymous key that

@@ -1,4 +1,4 @@
-# Grip & Race — climbing gym game
+# Climbing Race — climbing gym game
 
 A climbing game with a solo time-attack mode and a two-player online race.
 Static frontend on GitHub Pages, data and realtime on Supabase — no server to run.

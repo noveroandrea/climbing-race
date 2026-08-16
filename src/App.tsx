@@ -438,7 +438,7 @@ export default function App() {
           </div>
           <div className="min-w-0">
             <h1 className="text-[15px] sm:text-[23.5px] leading-tight whitespace-nowrap font-bold font-sans tracking-tight bg-gradient-to-r from-slate-100 via-slate-200 to-sky-400 bg-clip-text text-transparent">
-              Grip &amp; Race
+              Climbing Race
             </h1>
             <p className="text-[9.5px] sm:text-[13px] leading-tight uppercase font-mono tracking-wider font-semibold text-sky-400 truncate">
               {screen === 'menu' ? 'Main Menu'

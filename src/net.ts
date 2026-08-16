@@ -4,7 +4,7 @@
  */
 
 /**
- * Networking for Grip & Race, on Supabase instead of a Node server.
+ * Networking for Climbing Race, on Supabase instead of a Node server.
  *
  * Three jobs the old `server.ts` used to do, split by how often they change:
  *   • room state (who's in, phase, settings, result) → a `rooms` row + Realtime
