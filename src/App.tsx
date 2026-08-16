@@ -8,7 +8,9 @@ import { GameSettings, SerializedClimberState, FinalHeights } from './types';
 import { ClimbingCanvas } from './components/ClimbingCanvas';
 import { InstructionsModal } from './components/InstructionsModal';
 import { QuickGuide } from './components/InstructionsContent';
-import { RouteArchitecture, randomSeed } from './components/RouteArchitecture';
+import { RouteArchitecture, RouteSummary, randomSeed } from './components/RouteArchitecture';
+import { QuickStart, useQuickStart } from './components/QuickStart';
+import { useIsTouch, usePointerWords } from './lib/useIsTouch';
 import { motion } from 'motion/react';
 import {
   Trophy,
@@ -79,6 +81,9 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('menu');
   const [mode, setMode] = useState<Mode>('single');
   const [showInstructions, setShowInstructions] = useState(false);
+  const [showQuickStart, dismissQuickStart] = useQuickStart();
+  const isTouch = useIsTouch();
+  const pointer = usePointerWords();
   const [resetCount, setResetCount] = useState(0);
 
   // ── Identity / room ───────────────────────────────────────────────────────
@@ -235,7 +240,6 @@ export default function App() {
     seed: room?.settings.seed ?? 'BETA_CLIMB_32',
   }), [room?.settings.wallHeight, room?.settings.difficulty, room?.settings.seed]);
   const activeSettings = mode === 'single' ? SOLO_SETTINGS : multiSettings;
-  const settingsEditable = isHost && screen === 'lobby';
 
   // ── Menu actions ──────────────────────────────────────────────────────────
   const startSinglePlayer = () => {
@@ -305,12 +309,6 @@ export default function App() {
       () => { setCopied(true); setTimeout(() => setCopied(false), 1500); },
       () => { /* clipboard blocked — the id is on screen anyway */ },
     );
-  };
-
-  // ── Host-only settings edits ──────────────────────────────────────────────
-  const pushSettings = (patch: Partial<RoomState['settings']>) => {
-    if (!settingsEditable) return;
-    void net.updateSettings(patch);
   };
 
   // ── Finish handling ───────────────────────────────────────────────────────
@@ -499,6 +497,7 @@ export default function App() {
       {/* ══ MENU ═════════════════════════════════════════════════════════════ */}
       {screen === 'menu' && (
         <main className="flex-1 w-full max-w-3xl mx-auto p-6 flex flex-col gap-6">
+          {showQuickStart && <QuickStart onDismiss={dismissQuickStart} />}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -679,15 +678,9 @@ export default function App() {
               </div>
             )}
 
-            {/* Route configuration — multiplayer only; solo is a fixed route */}
-            {showRouteArch && (
-              <RouteArchitecture
-                settings={activeSettings}
-                editable={settingsEditable}
-                onChange={pushSettings}
-                showHostBadge={!isHost}
-              />
-            )}
+            {/* The route is chosen on the create form, so once the room exists
+                this is just a reminder of what everyone is climbing. */}
+            {showRouteArch && <RouteSummary settings={activeSettings} />}
 
             {showLeaderboard && <Leaderboard fullHeight />}
           </section>
@@ -972,8 +965,9 @@ export default function App() {
                 <Info className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-semibold text-slate-300 block">Pro Climbing Tactics:</span>
-                  Click a limb to select it, then click a reachable hold to move it there. Chalk up with Space to restore grip,
-                  and keep feet on holds to save stamina — campusing drains you fast!
+                  {pointer.tap} a limb to select it, then {pointer.taps} a reachable hold to move it there. Chalk up with{' '}
+                  {isTouch ? 'the bag button on the wall' : 'Space'} to restore grip, and keep feet on holds to save
+                  stamina — campusing drains you fast!
                 </div>
               </div>
             )}

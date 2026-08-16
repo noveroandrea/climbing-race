@@ -4,8 +4,9 @@
  */
 
 import React from 'react';
-import { AlertTriangle, Hammer, MousePointerClick, Zap, Target } from 'lucide-react';
+import { AlertTriangle, Hammer, MousePointerClick, Pointer, Zap, Target } from 'lucide-react';
 import { HoldSwatch, SwatchKind } from './HoldSwatch';
+import { useIsTouch, usePointerWords } from '../lib/useIsTouch';
 
 const HOLDS: { kind: SwatchKind; name: string; tone: string; border: string; text: string }[] = [
   {
@@ -50,7 +51,11 @@ const QUICK_HOLDS: { kind: SwatchKind; name: string; note: string; color: string
  * The cheat-sheet that sits beside the wall while you climb. Deliberately thin —
  * the full briefing lives behind the "How to Climb" button in the header.
  */
-export const QuickGuide: React.FC = () => (
+export const QuickGuide: React.FC = () => {
+  const touch = useIsTouch();
+  const w = usePointerWords();
+
+  return (
   <div className="space-y-3.5">
 
     {/* The one thing people forget */}
@@ -59,7 +64,7 @@ export const QuickGuide: React.FC = () => (
         Don't forget to put nails!!
       </p>
       <p className="text-[13.5px] text-amber-100/75 mt-1 leading-snug">
-        Hold your body 2s on four green jugs. Without one, a fall goes all the way down.
+        {w.hold} on your body for 2s, all four limbs on green jugs. Without a nail, a fall goes all the way down.
       </p>
     </div>
 
@@ -77,13 +82,13 @@ export const QuickGuide: React.FC = () => (
     {/* Four rules */}
     <dl className="text-[14.5px] leading-snug divide-y divide-slate-800/80 border-y border-slate-800/80">
       <div className="flex gap-2 py-1.5">
-        <dt className="shrink-0 w-24 font-mono text-[12.5px] text-sky-400 pt-px">CLICK · CLICK</dt>
-        <dd className="text-slate-400">Click to select another limb, then click to select a hold.</dd>
+        <dt className="shrink-0 w-24 font-mono text-[12.5px] text-sky-400 pt-px uppercase">{w.taps} · {w.taps}</dt>
+        <dd className="text-slate-400">{w.tap} to select another limb, then {w.taps} to select a hold.</dd>
       </div>
       <div className="flex gap-2 py-1.5">
-        <dt className="shrink-0 w-24 font-mono text-[12.5px] text-sky-400 pt-px">SPACE · BAG</dt>
+        <dt className="shrink-0 w-24 font-mono text-[12.5px] text-sky-400 pt-px">{touch ? 'BAG BUTTON' : 'SPACE · BAG'}</dt>
         <dd className="text-slate-400">
-          Chalk — the key, or the bag button on the top right of the wall. Needs{' '}
+          Chalk — {touch ? 'the bag button on the top right of the wall' : 'the key, or the bag button on the top right of the wall'}. Needs{' '}
           <strong className="text-slate-200">70%</strong>, drains <strong className="text-slate-200">70%</strong>.
         </dd>
       </div>
@@ -92,20 +97,37 @@ export const QuickGuide: React.FC = () => (
         <dd className="text-slate-400">Hammer a nail — your fall stops here.</dd>
       </div>
       <div className="flex gap-2 py-1.5">
-        <dt className="shrink-0 w-24 font-mono text-[12.5px] text-rose-400 pt-px">2× TAP BODY</dt>
+        <dt className="shrink-0 w-24 font-mono text-[12.5px] text-rose-400 pt-px uppercase">2× {w.taps} BODY</dt>
         <dd className="text-slate-400">New rock to ease the climb, <strong className="text-rose-300">but you fall to your last nail.</strong> <strong className="text-slate-200">Jump start.</strong></dd>
       </div>
     </dl>
 
     <p className="text-[13px] text-slate-600 text-center">Full rules: “How to Climb”, top right.</p>
   </div>
-);
+  );
+};
 
 /**
  * The full how-to-climb briefing, shown in the pop-up modal.
  */
-export const InstructionsContent: React.FC = () => (
+export const InstructionsContent: React.FC = () => {
+  const touch = useIsTouch();
+  const w = usePointerWords();
+
+  return (
   <div className="space-y-4">
+
+    {/* Which input device these instructions are written for */}
+    <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
+      {touch
+        ? <Pointer className="w-4 h-4 text-sky-400 shrink-0" />
+        : <MousePointerClick className="w-4 h-4 text-sky-400 shrink-0" />}
+      <p className="text-[13.5px] text-slate-400 leading-snug">
+        {touch
+          ? 'You are on a touch screen, so everything below is done with your finger — no mouse, no keyboard.'
+          : 'You are on a mouse and keyboard. On a phone or tablet every click below becomes a tap, and the Space key is replaced by the on-screen chalk bag button.'}
+      </p>
+    </div>
 
     {/* ── The one thing people forget ─────────────────────────────────────── */}
     <div className="relative overflow-hidden rounded-2xl border-2 border-amber-400/60 bg-gradient-to-br from-amber-500/20 via-amber-600/10 to-orange-500/15 p-4 text-center">
@@ -115,7 +137,7 @@ export const InstructionsContent: React.FC = () => (
         Don't forget to put nails!!
       </p>
       <p className="relative text-[14.5px] text-amber-100/80 mt-1.5 leading-snug">
-        Hold the mouse on your climber's body for <strong className="text-amber-200">2 seconds</strong> to hammer one in.
+        {w.hold} on your climber's body for <strong className="text-amber-200">2 seconds</strong> to hammer one in.
         It needs all four limbs on green jugs. A nail catches you when you fall past it — without one you drop all the way
         to the mats.
       </p>
@@ -127,7 +149,7 @@ export const InstructionsContent: React.FC = () => (
         <MousePointerClick className="w-3.5 h-3.5" /> Moving
       </h3>
       <p className="text-[15px] text-slate-300 leading-relaxed">
-        Click a hand or foot to select it, then click a highlighted hold to move it there. Selection auto-cycles
+        {w.tap} a hand or foot to select it, then {w.taps} a highlighted hold to move it there. Selection auto-cycles
         clockwise: <span className="font-mono text-slate-200">LH → RH → RF → LF</span>. Only holds inside the yellow
         reach arc are within range.
       </p>
@@ -160,7 +182,7 @@ export const InstructionsContent: React.FC = () => (
         <HoldSwatch kind="rock" />
         <div className="min-w-0 text-[14.5px] leading-relaxed text-slate-300">
           <p>
-            <strong className="text-slate-100">Double-tap your climber's body</strong> to slam a new rock into the wall
+            <strong className="text-slate-100">{w.doubleTap} your climber's body</strong> to slam a new rock into the wall
             about a metre above you. It's there to <strong className="text-emerald-300">ease your climb</strong> — an
             extra hold exactly where the route gave you none.
           </p>
@@ -187,10 +209,13 @@ export const InstructionsContent: React.FC = () => (
         <li className="flex gap-2">
           <Target className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" />
           <span>
-            <strong className="text-slate-100">Chalk up</strong> with{' '}
-            <kbd className="px-1 text-slate-100 bg-slate-800 rounded font-mono text-[13px]">Space</kbd> — or tap the{' '}
-            <strong className="text-sky-300">chalk bag button on the top right of the wall</strong>, which is the way
-            to do it on a phone — to halve your grip drain for 5 seconds and claw back some stamina.{' '}
+            <strong className="text-slate-100">Chalk up</strong>{touch ? ' by tapping the ' : ' with '}
+            {!touch && (
+              <><kbd className="px-1 text-slate-100 bg-slate-800 rounded font-mono text-[13px]">Space</kbd> — or by clicking the </>
+            )}
+            <strong className="text-sky-300">chalk bag button on the top right of the wall</strong>
+            {touch ? '' : ', which is the way to do it on a phone'} — to halve your grip drain for 5 seconds and claw
+            back some stamina.{' '}
             <strong className="text-sky-300">Your chalk must be at 70% to use it, and one use drains 70%</strong> —
             leaving the bag empty. It refills slowly (~3%/s) only while you hang steady with your feet on the wall,
             so you get one dip roughly every 23 seconds. Spend it wisely.
@@ -206,4 +231,5 @@ export const InstructionsContent: React.FC = () => (
       </ul>
     </section>
   </div>
-);
+  );
+};

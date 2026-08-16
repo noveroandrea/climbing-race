@@ -12,35 +12,60 @@ interface Props {
   /** Host in the lobby, or anyone filling in the create-game form. */
   editable: boolean;
   onChange: (patch: Partial<RoomSettings>) => void;
-  /** The "set by host" badge — only meaningful once a room exists. */
-  showHostBadge?: boolean;
   className?: string;
 }
 
 export const randomSeed = () =>
   `ROUTE_${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 
+const GRADE_TONE: Record<RoomSettings['difficulty'], string> = {
+  easy: 'text-emerald-300 border-emerald-500/30 bg-emerald-950/40',
+  medium: 'text-sky-300 border-sky-500/30 bg-sky-950/40',
+  hard: 'text-rose-300 border-rose-500/30 bg-rose-950/40',
+};
+
 /**
- * Difficulty / height / seed picker. Used twice: as a card in the lobby's left
- * column, and inline in the create-game form so the host chooses the route
- * before the room exists.
+ * The read-only version, for once the room exists and the route is settled —
+ * grade, height, clock and seed on two lines instead of a screenful of pickers.
+ */
+export const RouteSummary: React.FC<{ settings: RoomSettings }> = ({ settings }) => (
+  <div className="bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3 shadow-xl">
+    <h3 className="text-[12.5px] uppercase tracking-wider text-slate-500 font-bold mb-2 flex items-center gap-1.5 font-sans">
+      <Settings className="w-3 h-3 text-sky-400" />
+      Route
+    </h3>
+    <div className="flex items-center gap-1.5 font-sans">
+      <span className={`px-2 py-0.5 rounded-md border text-[12.5px] font-bold uppercase tracking-tight ${GRADE_TONE[settings.difficulty]}`}>
+        {settings.difficulty}
+      </span>
+      <span className="px-2 py-0.5 rounded-md border border-slate-700 bg-slate-950/60 text-[12.5px] font-mono font-bold text-slate-300">
+        {settings.wallHeight / 100}m
+      </span>
+      <span className="px-2 py-0.5 rounded-md border border-slate-700 bg-slate-950/60 text-[12.5px] font-mono font-bold text-slate-300 flex items-center gap-1">
+        <Timer className="w-3 h-3 text-slate-500" />3:00
+      </span>
+    </div>
+    <p className="mt-1.5 font-mono text-[11.5px] text-slate-500 truncate" title={settings.seed}>
+      {settings.seed}
+    </p>
+  </div>
+);
+
+/**
+ * Difficulty / height / seed picker. Shown inline in the create-game form so the
+ * host chooses the route before the room exists; once the room is up, the lobby
+ * shows {@link RouteSummary} instead.
  */
 export const RouteArchitecture: React.FC<Props> = ({
   settings,
   editable,
   onChange,
-  showHostBadge = false,
   className = 'bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl',
 }) => (
   <div className={className}>
     <h3 className="text-[15.5px] uppercase tracking-wider text-slate-400 font-bold mb-3.5 flex items-center gap-1.5 font-sans">
       <Settings className="w-3.5 h-3.5 text-sky-400" />
       Route Architecture
-      {showHostBadge && (
-        <span className="ml-auto text-[11.5px] font-mono text-amber-400/80 border border-amber-500/20 rounded px-1">
-          set by host
-        </span>
-      )}
     </h3>
 
     <div className="space-y-4 text-[15.5px] font-sans">

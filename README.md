@@ -23,6 +23,11 @@ the top right of the wall**, which is how you do it on a phone — chalks up (ne
 but drops you to your last nail. **Hold your body for 2 seconds** on four green
 jugs to hammer a nail, which catches your next fall.
 
+On a touch screen every click above is a tap and there is no keyboard, so the
+instructions rewrite themselves — `useIsTouch` (`src/lib/useIsTouch.ts`) watches
+`(hover: none) and (pointer: coarse)`, which asks about the input device rather
+than guessing from the window width.
+
 ---
 
 ## How the multiplayer works without a server
