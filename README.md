@@ -14,16 +14,25 @@ Every wall gets harder with height, in 5m sections:
 
 | Section | Green jugs | Holds |
 |---|---|---|
-| 0–5m | 90% | 30 |
-| 5–10m | 85% | 28 |
-| 10–15m | 80% | 26 |
-| … | −5% per section | −2 per section |
-| 50m and up | 50% (floor) | 10 (floor) |
+| 0–5m | 80% | 20 |
+| 5–10m | 72% | 18 |
+| 10–15m | 66% | 16 |
+| 15–20m | 61% | 14 |
+| 20–25m | 56% | 13 |
+| 25–30m | 51% | 12 |
+| 30–35m | 50% | 11 |
+| 35m and up | 50% (floor) | 10 (floor) |
+
+Green falls eight points a section down to 66%, then five a section down to 51%;
+holds drop by two down to 14, then by one down to 11. The two reach their own
+floors a section apart — steps of eight from 80% skip straight past 66% (80 → 72
+→ 64), so green stops there and switches to fives while the holds are still
+stepping down by two.
 
 Green jugs are the restful holds — the only ones you recover stamina on and the
 only ones you can hammer a nail from — so thinning them out is what makes the
-route bite. The shares are exact, not a dice roll per hold: a 26-hold section at
-80% gets 21 jugs. `sectionGreenShare` / `sectionHoldCount` in `src/utils.ts` are
+route bite. The shares are exact, not a dice roll per hold: a 16-hold section at
+66% gets 11 jugs. `sectionGreenShare` / `sectionHoldCount` in `src/utils.ts` are
 the single source of truth, and the in-app ramp card reads from them.
 
 ## Modes

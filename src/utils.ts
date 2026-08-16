@@ -103,14 +103,33 @@ export const CLIMB_BLOCK_HEIGHT = 200 * PX_PER_METRE;  // 200m before the patter
 export const SECTIONS_PER_BLOCK = CLIMB_BLOCK_HEIGHT / SECTION_HEIGHT;
 
 /**
- * Share of holds that are green jugs in the section starting at `index * 5m`:
- * 90% down to a floor of 50%, five points per section. Green is the restful,
- * nail-friendly hold, so this is what makes the wall bite the higher you get.
+ * The route profile, section by section, each covering 5m.
+ *
+ * Green jugs fall away fast at first — eight points a section — and then five
+ * at a time once they are down to two thirds of the wall, settling at half.
+ * Holds thin out alongside them, two a section and then one. Green is the
+ * restful, nail-friendly hold, so this is what makes the wall bite up high.
+ *
+ * The two run to their own floors rather than in lockstep: from 80%, steps of
+ * eight overshoot 66% (80 → 72 → 64), so green stops at 66 and starts stepping
+ * by five, while holds still need a third step of two to reach 14.
+ *
+ * Both hold their last value for the rest of the 200m.
  */
-export const sectionGreenShare = (index: number) => Math.max(0.5, 0.9 - 0.05 * index);
+const GREEN_PERCENT = [80, 72, 66, 61, 56, 51, 50];
+const HOLD_COUNT = [20, 18, 16, 14, 13, 12, 11, 10];
 
-/** Holds in that same section: 30 down to a floor of 10, two fewer each time. */
-export const sectionHoldCount = (index: number) => Math.max(10, 30 - 2 * index);
+const atSection = (steps: number[], index: number) =>
+  steps[Math.min(Math.max(0, Math.floor(index)), steps.length - 1)];
+
+/** Share of holds that are green jugs in the section starting at `index * 5m`. */
+export const sectionGreenShare = (index: number) => atSection(GREEN_PERCENT, index) / 100;
+
+/** How many holds that same section gets. */
+export const sectionHoldCount = (index: number) => atSection(HOLD_COUNT, index);
+
+/** First section where neither number moves again — where the wall stops getting harder. */
+export const SETTLES_AT_SECTION = Math.max(GREEN_PERCENT.length, HOLD_COUNT.length) - 1;
 
 interface Tuning {
   crimp: number;

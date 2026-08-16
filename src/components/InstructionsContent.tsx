@@ -234,9 +234,9 @@ export const InstructionsContent: React.FC = () => {
           <Zap className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
           <span>
             <strong className="text-slate-100">The wall fights back as you gain height.</strong> Each wall is 200m and
-            never repeats. The first 5m are 90% green jugs with 30 holds to choose from; every 5m after that loses
-            5% of its green and two of its holds, bottoming out at 50% green and 10 holds. Rests and nail spots get
-            rare exactly when you need them most.
+            never repeats. The first 5m are 80% green jugs with 20 holds to choose from; the green drops eight points
+            every 5m, then five, and the holds thin out with it — from 35m up it stays at its hardest, 50% green and
+            10 holds a section. Rests and nail spots get rare exactly when you need them most.
           </span>
         </li>
       </ul>
