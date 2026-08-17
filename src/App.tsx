@@ -145,6 +145,13 @@ export default function App() {
 
   useEffect(() => { loadScores(); }, [loadScores]);
 
+  // Every screen is a page of its own, so it starts at the top. Without this you
+  // arrive at a new screen still scrolled down where the last one left you —
+  // halfway down the leaderboard, or below the wall you are meant to be climbing.
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+  }, [screen]);
+
   // ── Realtime wiring (once) ────────────────────────────────────────────────
   useEffect(() => {
     const offRoom = net.onRoomUpdate((data: RoomState) => {
