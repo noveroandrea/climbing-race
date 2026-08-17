@@ -53,6 +53,7 @@ const soloSettings = (climb: number): GameSettings => ({
   gravity: 0.45,
   seed: climbById(climb).seed,
   timeLimitMs: 120000, // 2 minutes
+  climb,
 });
 
 const randomGameId = () => `GYM${Math.floor(1000 + Math.random() * 9000)}`;
@@ -241,7 +242,8 @@ export default function App() {
     mode: 'split',
     gravity: 0.45,
     seed: room?.settings.seed ?? climbById(1).seed,
-  }), [room?.settings.wallHeight, room?.settings.difficulty, room?.settings.seed]);
+    climb: room?.settings.climb ?? 1,
+  }), [room?.settings.wallHeight, room?.settings.difficulty, room?.settings.seed, room?.settings.climb]);
   const soloGameSettings = useMemo<GameSettings>(() => soloSettings(climbId), [climbId]);
   const activeSettings = mode === 'single' ? soloGameSettings : multiSettings;
 

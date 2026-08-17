@@ -5,8 +5,113 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { Climber, Hold, GameSettings, ClimberLimb, SerializedClimberState, FinalHeights } from '../types';
-import { generateHoldsForWall, calculateJointBend, getDistance, ROCK_COLOR, ROCK_SIZE, ROCK_SHAPE } from '../utils';
+import { generateHoldsForWall, createRandom, calculateJointBend, getDistance, ROCK_COLOR, ROCK_SIZE, ROCK_SHAPE } from '../utils';
+import { themeFor } from '../climbs';
 import rightShoesUrl from '@/assets/right_shoes.png';
+
+/** One sponsor eagle painted on the panels, in wall coordinates. */
+interface WallMark {
+  x: number;
+  y: number;
+  size: number;
+  angle: number;
+  alpha: number;
+}
+
+/**
+ * A spread-winged eagle over the sponsor's name, drawn by hand in canvas paths —
+ * an homage in the same spirit as the logos a real gym paints on its panels, not
+ * a reproduction of the official artwork.
+ *
+ * Painted once into an offscreen tile and blitted from there: the wings, body
+ * and beak overlap, and semi-transparent fills stacked on each other would show
+ * every seam between them.
+ */
+const SPRITE_PX = 256;
+let salewaSprite: HTMLCanvasElement | null = null;
+
+function salewaTile(): HTMLCanvasElement {
+  if (salewaSprite) return salewaSprite;
+  const tile = document.createElement('canvas');
+  tile.width = SPRITE_PX;
+  tile.height = SPRITE_PX;
+  const tctx = tile.getContext('2d')!;
+  tctx.translate(SPRITE_PX / 2, SPRITE_PX / 2);
+  paintSalewa(tctx, SPRITE_PX * 0.42);
+  salewaSprite = tile;
+  return tile;
+}
+
+function drawSalewaMark(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  size: number,
+  angle: number,
+  alpha: number,
+) {
+  const tile = salewaTile();
+  const w = size * 2.6;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  ctx.drawImage(tile, -w / 2, -w / 2, w, w);
+  ctx.restore();
+}
+
+/** The mark itself, centred on the origin, at the given scale. */
+function paintSalewa(ctx: CanvasRenderingContext2D, size: number) {
+  // Right half of the bird, in a unit box; the left half is this mirrored.
+  // Leading edge sweeps up and out to the tip, trailing edge comes back in
+  // through two feather notches.
+  const WING: [number, number][] = [
+    [0.42, -0.54], [0.80, -0.66], [1.05, -0.50],
+    [0.74, -0.30], [0.92, -0.18], [0.56, -0.08], [0.66, 0.10], [0.30, -0.02],
+  ];
+
+  ctx.save();
+  ctx.fillStyle = '#0f172a';
+
+  ctx.save();
+  ctx.scale(size, size);
+  for (const dir of [1, -1]) {
+    ctx.beginPath();
+    ctx.moveTo(dir * 0.08, -0.44);
+    for (const [x, y] of WING) ctx.lineTo(dir * x, y);
+    ctx.lineTo(dir * 0.10, 0.06);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Head, breast and tail down the middle
+  ctx.beginPath();
+  ctx.moveTo(0, -0.74);
+  ctx.lineTo(0.11, -0.62);
+  ctx.lineTo(0.13, -0.46);
+  ctx.lineTo(0.12, 0.16);
+  ctx.lineTo(0, 0.58);
+  ctx.lineTo(-0.12, 0.16);
+  ctx.lineTo(-0.13, -0.46);
+  ctx.lineTo(-0.11, -0.62);
+  ctx.closePath();
+  ctx.fill();
+
+  // Beak
+  ctx.beginPath();
+  ctx.moveTo(0.06, -0.70);
+  ctx.lineTo(0.36, -0.62);
+  ctx.lineTo(0.06, -0.54);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore(); // out of the unit box; the wordmark wants real pixels
+
+  ctx.font = `bold ${(size * 0.3).toFixed(1)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('SALEWA', 0, size * 0.95);
+  ctx.restore();
+}
 
 interface ClimbingCanvasProps {
   settings: GameSettings;
@@ -87,6 +192,7 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
   const p1Ref = useRef<Climber | null>(null);
   const p2Ref = useRef<Climber | null>(null);
   const holdsRef = useRef<Hold[]>([]);
+  const wallMarksRef = useRef<WallMark[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const gameRunningRef = useRef<boolean>(false);
 
@@ -176,6 +282,7 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
   // route fits vertically — the view is cropped at the top.
   const ZOOM = 1.5;
   const WALL_HEIGHT = settings.wallHeight;
+  const theme = themeFor(settings.climb); // how this wall is painted
   const REACH_DISTANCE = 150; // 1.5m extension bound where 100px = 1m
   const MOVE_COOLDOWN = 180;
   const FALLING_ACCELERATION = 0.4;
@@ -250,6 +357,25 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
     // Generate identical or unique routes
     const holds = generateHoldsForWall(WALL_HEIGHT, CANVAS_WIDTH / 2, settings.difficulty, settings.seed);
     holdsRef.current = holds;
+
+    // Sponsor eagles, scattered up the wall from the same seed as the route so
+    // both climbers see them in the same places.
+    const marks: WallMark[] = [];
+    if (theme.logos) {
+      const rng = createRandom(`${settings.seed}_MARKS`);
+      const colW = CANVAS_WIDTH / 2;
+      for (let y = 260; y < WALL_HEIGHT; y += 620 + rng() * 380) {
+        const size = 34 + rng() * 30;
+        marks.push({
+          x: 70 + rng() * (colW - 140),
+          y,
+          size,
+          angle: (rng() - 0.5) * 0.5,
+          alpha: 0.28 + rng() * 0.22,
+        });
+      }
+    }
+    wallMarksRef.current = marks;
     
     const initialLimb = (x: number, y: number, holdId: string | null): ClimberLimb => ({
       x,
@@ -1093,12 +1219,12 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
           return xOffset + gymX;
         };
 
-        // --- DRAW WOOD PANEL GYM WALL BACKGROUND ---
-        ctx.fillStyle = settings.wallStyle === 'concrete' ? '#4b5563' : settings.wallStyle === 'neon' ? '#0f172a' : '#dbc3a7'; // warm wood plywood defaults
+        // --- DRAW PANEL GYM WALL BACKGROUND ---
+        ctx.fillStyle = theme.wall;
         ctx.fillRect(xOffset, 0, halfW, VIEW_HEIGHT);
 
         // Wooden joint panels Lines & Peg Bolt Holes
-        ctx.strokeStyle = settings.wallStyle === 'concrete' ? '#374151' : settings.wallStyle === 'neon' ? '#1e293b' : '#c49f76';
+        ctx.strokeStyle = theme.panel;
         ctx.lineWidth = 2;
         
         // Plywood tile patterns (200px x 200px grid layout)
@@ -1117,7 +1243,7 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
         }
 
         // Subtle bolt holes
-        ctx.fillStyle = settings.wallStyle === 'concrete' ? '#1f2937' : settings.wallStyle === 'neon' ? '#020617' : '#8c603b';
+        ctx.fillStyle = theme.bolt;
         for (let gy = -scrollOffsetGrid + 100; gy < VIEW_HEIGHT + 200; gy += 200) {
           for (let gx = 100; gx < halfW; gx += 200) {
             ctx.beginPath();
@@ -1126,17 +1252,26 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
           }
         }
 
+        // --- SPONSOR EAGLES, SPRAYED ON THE PANELS ---
+        // Behind the holds, so they read as paint on the wall rather than as
+        // something you could grab.
+        for (const mark of wallMarksRef.current) {
+          const sY = toScreenY(mark.y);
+          if (sY < -mark.size || sY > VIEW_HEIGHT + mark.size) continue;
+          drawSalewaMark(ctx, toScreenX(mark.x), sY, mark.size, mark.angle, mark.alpha);
+        }
+
         // --- DRAW BOTTOM SAFETY CRASH MAT ---
         const matsScreenY = toScreenY(0);
         if (matsScreenY < VIEW_HEIGHT) {
-          ctx.fillStyle = '#0f766e'; // Deep teal matting
+          ctx.fillStyle = theme.mat;
           ctx.fillRect(xOffset, matsScreenY, halfW, VIEW_HEIGHT - matsScreenY);
-          
-          ctx.strokeStyle = '#115e59';
+
+          ctx.strokeStyle = theme.matEdge;
           ctx.lineWidth = 4;
           ctx.strokeRect(xOffset + 2, matsScreenY, halfW - 4, VIEW_HEIGHT - matsScreenY);
 
-          ctx.fillStyle = '#2dd4bf';
+          ctx.fillStyle = theme.matInk;
           ctx.font = 'bold 11px monospace';
           ctx.fillText('SAFETY PAD - 100% SECURE', xOffset + 15, matsScreenY + 24);
         }
@@ -1616,6 +1751,13 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
 
         // Hands & feet icons are drawn LAST so they stay on the top layer
         drawLimbCaps();
+
+        // Lights out: the night wall gets a wash over the whole column, climber
+        // included, so the session reads as dark rather than just dark-painted.
+        if (theme.dim) {
+          ctx.fillStyle = theme.dim;
+          ctx.fillRect(xOffset, 0, halfW, VIEW_HEIGHT);
+        }
 
         ctx.restore();
       };

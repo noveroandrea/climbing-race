@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Mountain, TrendingDown } from 'lucide-react';
+import { TrendingDown } from 'lucide-react';
 import { CLIMBS } from '../climbs';
 import { SETTLES_AT_SECTION, sectionGreenShare, sectionHoldCount } from '../utils';
 
@@ -51,7 +51,11 @@ export const ClimbPicker: React.FC<Props> = ({ value, onPick, disabled = false, 
           }`}
         >
           <div className="flex items-center gap-2 mb-1">
-            <Mountain className={`w-4 h-4 shrink-0 ${value === c.id ? 'text-emerald-400' : 'text-slate-500'}`} />
+            {/* The wall's own colour, so the four read as four places */}
+            <span
+              className="w-4 h-4 rounded shrink-0 border"
+              style={{ background: c.theme.wall, borderColor: c.theme.panel }}
+            />
             <span className="font-mono text-[11.5px] uppercase tracking-wider text-slate-500">Climb {c.id}</span>
             <span className="ml-auto font-mono text-[11.5px] text-slate-500">200m</span>
           </div>

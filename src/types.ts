@@ -57,8 +57,6 @@ export interface Climber {
   grounded: boolean;
 }
 
-export type WallStyle = 'wood' | 'concrete' | 'neon';
-
 export interface GameSettings {
   wallHeight: number; // total scroll height
   difficulty: 'easy' | 'medium' | 'hard';
@@ -66,6 +64,8 @@ export interface GameSettings {
   gravity: number;
   seed: string;
   timeLimitMs?: number; // defaults to 3 minutes when omitted
+  /** Which of the four walls — decides how the panels are painted (see climbs.ts) */
+  climb?: number;
 }
 
 /** Height reached by each climber, in metres, when the round ended. */

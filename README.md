@@ -10,6 +10,16 @@ and on the create-game form for a race. They are all **200m tall and never repea
 inside those 200m** — past the top the same block simply stacks again, which no
 clock in the game is long enough to reach.
 
+Each wall is painted differently: Home Wall is the warm plywood the gym always
+had, Slate Quarry is cold grey stone, Salewa Cube is a pale sponsored box with
+eagles sprayed up the panels, and Night Session is dark with the lights out —
+a wash over the whole column, climber included. The palettes live with the
+climbs in `src/climbs.ts`; `ClimbingCanvas` reads one via `themeFor`.
+
+The eagle is drawn from canvas paths in `ClimbingCanvas.tsx` (`paintSalewa`) —
+a hand-drawn homage of the kind a gym paints on its own panels, not the official
+artwork, and not an endorsement by or affiliation with Salewa.
+
 Every wall gets harder with height, in 5m sections:
 
 | Section | Green jugs | Holds |
