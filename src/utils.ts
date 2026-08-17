@@ -148,10 +148,10 @@ const TUNING: Record<'easy' | 'medium' | 'hard', Tuning> = {
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /**
- * One 200m block. Holds are laid out in rows rather than scattered, because the
- * counts above get thin near the top and a climber has to be able to reach the
- * next hold from the last one — each row is placed within arm's span of the row
- * below it.
+ * One 200m block. Holds land where the dice put them, anywhere across the width
+ * of the wall — no rows, no corridor kept within arm's span of the hold below.
+ * That means the route is not guaranteed to be climbable hand-over-hand the
+ * whole way; where it isn't, placing a rock is the way through.
  */
 function generateBlock(
   rng: () => number,
@@ -196,70 +196,47 @@ function generateBlock(
     return list;
   };
 
-  // Where the previous row sat, so the next one stays within reach of it
-  let anchorX = midX;
+  /**
+   * Somewhere in the given box that isn't on top of another hold. Several throws
+   * of the dice, keeping the one furthest from its neighbours — the position
+   * stays random, it just doesn't stack two holds in the same spot.
+   */
+  const scatter = (yLow: number, yHigh: number, xLow = minX, xHigh = maxX) => {
+    let best = { x: midX, y: (yLow + yHigh) / 2 };
+    let bestGap = -1;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const x = xLow + rng() * (xHigh - xLow);
+      const y = yLow + rng() * (yHigh - yLow);
+      let gap = Infinity;
+      for (const h of holds) {
+        if (Math.abs(h.y - y) > 90) continue;
+        gap = Math.min(gap, Math.hypot(h.x - x, h.y - y));
+      }
+      if (gap > bestGap) { bestGap = gap; best = { x, y }; }
+      if (gap >= 52) break;
+    }
+    return best;
+  };
 
   for (let section = 0; section < SECTIONS_PER_BLOCK; section++) {
     const count = sectionHoldCount(section);
     const baseY = section * SECTION_HEIGHT;
     const types = sectionTypes(count, sectionGreenShare(section));
-    let cursor = 0;
-    // Starting-shelf holds have to be jugs, so they take one out of the section's
-    // own green quota instead of being added on top of it.
-    const takeType = (forceJug: boolean): HoldType => {
-      if (forceJug) {
-        const swap = types.indexOf('jug', cursor);
-        if (swap >= 0) [types[cursor], types[swap]] = [types[swap], types[cursor]];
-        else types[cursor] = 'jug';
+
+    for (let i = 0; i < count; i++) {
+      // The four holds you start on are the one fixed thing about a wall: a jug
+      // near each quarter of the ground shelf, so a fall always has something to
+      // land back onto. They come out of section 0's own budget and green quota.
+      if (section === 0 && i < 4) {
+        const quarter = (maxX - minX) / 4;
+        const spot = scatter(60, 180, minX + quarter * i, minX + quarter * (i + 1));
+        const swap = types.indexOf('jug', i);
+        if (swap >= 0) [types[i], types[swap]] = [types[swap], types[i]];
+        addHold(spot.x, spot.y, 'jug');
+        continue;
       }
-      return types[cursor++];
-    };
-
-    // ~60px between rows, which is comfortably inside the 150px reach
-    const rows = Math.min(8, count);
-    const rowH = SECTION_HEIGHT / rows;
-
-    // Spread the section's holds over its rows, handing the remainder out at
-    // random so the extra hold isn't always on the same row of every section.
-    const perRow = Array.from({ length: rows }, () => Math.floor(count / rows));
-    const order = perRow.map((_, r) => r);
-    for (let i = order.length - 1; i > 0; i--) {          // Fisher-Yates
-      const j = Math.floor(rng() * (i + 1));
-      [order[i], order[j]] = [order[j], order[i]];
-    }
-    for (let extra = 0; extra < count % rows; extra++) perRow[order[extra]]++;
-
-    for (let r = 0; r < rows; r++) {
-      const k = perRow[r];
-      if (k === 0) continue;
-      const rowY = baseY + r * rowH + rowH * (0.3 + rng() * 0.4);
-
-      // The bottom of the wall is the starting shelf: full width, all jugs.
-      const isStart = rowY < 190;
-      const span = isStart ? maxX - minX : Math.max(200, k * 90);
-      const lo = clamp(anchorX - span / 2, minX, maxX - span);
-      const slot = span / k;
-
-      let sum = 0;
-      for (let i = 0; i < k; i++) {
-        // A few jitters per slot, keeping whichever sits furthest from its
-        // neighbours — planned rows still collide now and then.
-        let bestX = lo + slot * (i + 0.5);
-        let bestGap = -1;
-        for (let attempt = 0; attempt < 5; attempt++) {
-          const x = clamp(lo + slot * (i + 0.5) + (rng() - 0.5) * slot * 0.6, minX, maxX);
-          let gap = Infinity;
-          for (const h of holds) {
-            if (Math.abs(h.y - rowY) > 90) continue;
-            gap = Math.min(gap, Math.hypot(h.x - x, h.y - rowY));
-          }
-          if (gap > bestGap) { bestGap = gap; bestX = x; }
-          if (gap >= 48) break;
-        }
-        addHold(bestX, rowY, takeType(isStart));
-        sum += bestX;
-      }
-      anchorX = sum / k;
+      const spot = scatter(baseY, baseY + SECTION_HEIGHT);
+      addHold(spot.x, spot.y, types[i]);
     }
   }
 
