@@ -64,7 +64,9 @@ export const CLIMBS: readonly Climb[] = [
   {
     id: 3,
     name: 'Salewa Cube',
-    seed: 'CLIMB_03_CUBE',
+    // Redrawn, and picked out of two dozen draws for the kindest one: it goes
+    // furthest on holds alone before you have to start placing rocks.
+    seed: 'SALEWA_CUBE_17',
     blurb: 'The sponsored box — eagles on every panel, holds all over the place.',
     theme: {
       wall: '#e7ebf0', panel: '#c3ccd8', bolt: '#94a3b8',

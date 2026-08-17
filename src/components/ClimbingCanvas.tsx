@@ -8,6 +8,7 @@ import { Climber, Hold, GameSettings, ClimberLimb, SerializedClimberState, Final
 import { generateHoldsForWall, createRandom, calculateJointBend, getDistance, ROCK_COLOR, ROCK_SIZE, ROCK_SHAPE } from '../utils';
 import { themeFor } from '../climbs';
 import rightShoesUrl from '@/assets/right_shoes.png';
+import salewaUrl from '@/assets/salewa.png';
 
 /** One sponsor eagle painted on the panels, in wall coordinates. */
 interface WallMark {
@@ -19,97 +20,26 @@ interface WallMark {
 }
 
 /**
- * A spread-winged eagle over the sponsor's name, drawn by hand in canvas paths —
- * an homage in the same spirit as the logos a real gym paints on its panels, not
- * a reproduction of the official artwork.
- *
- * Painted once into an offscreen tile and blitted from there: the wings, body
- * and beak overlap, and semi-transparent fills stacked on each other would show
- * every seam between them.
+ * The sponsor's own logo, sprayed on the Salewa Cube's panels. `salewa.png` is a
+ * transparent PNG, so it composites straight onto whatever colour the wall is.
  */
-const SPRITE_PX = 256;
-let salewaSprite: HTMLCanvasElement | null = null;
-
-function salewaTile(): HTMLCanvasElement {
-  if (salewaSprite) return salewaSprite;
-  const tile = document.createElement('canvas');
-  tile.width = SPRITE_PX;
-  tile.height = SPRITE_PX;
-  const tctx = tile.getContext('2d')!;
-  tctx.translate(SPRITE_PX / 2, SPRITE_PX / 2);
-  paintSalewa(tctx, SPRITE_PX * 0.42);
-  salewaSprite = tile;
-  return tile;
-}
-
 function drawSalewaMark(
   ctx: CanvasRenderingContext2D,
+  logo: HTMLImageElement | null,
   cx: number,
   cy: number,
   size: number,
   angle: number,
   alpha: number,
 ) {
-  const tile = salewaTile();
-  const w = size * 2.6;
+  if (!logo?.naturalWidth) return; // still loading
+  const w = size * 2.4;
+  const h = w * (logo.naturalHeight / logo.naturalWidth);
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.translate(cx, cy);
   ctx.rotate(angle);
-  ctx.drawImage(tile, -w / 2, -w / 2, w, w);
-  ctx.restore();
-}
-
-/** The mark itself, centred on the origin, at the given scale. */
-function paintSalewa(ctx: CanvasRenderingContext2D, size: number) {
-  // Right half of the bird, in a unit box; the left half is this mirrored.
-  // Leading edge sweeps up and out to the tip, trailing edge comes back in
-  // through two feather notches.
-  const WING: [number, number][] = [
-    [0.42, -0.54], [0.80, -0.66], [1.05, -0.50],
-    [0.74, -0.30], [0.92, -0.18], [0.56, -0.08], [0.66, 0.10], [0.30, -0.02],
-  ];
-
-  ctx.save();
-  ctx.fillStyle = '#0f172a';
-
-  ctx.save();
-  ctx.scale(size, size);
-  for (const dir of [1, -1]) {
-    ctx.beginPath();
-    ctx.moveTo(dir * 0.08, -0.44);
-    for (const [x, y] of WING) ctx.lineTo(dir * x, y);
-    ctx.lineTo(dir * 0.10, 0.06);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // Head, breast and tail down the middle
-  ctx.beginPath();
-  ctx.moveTo(0, -0.74);
-  ctx.lineTo(0.11, -0.62);
-  ctx.lineTo(0.13, -0.46);
-  ctx.lineTo(0.12, 0.16);
-  ctx.lineTo(0, 0.58);
-  ctx.lineTo(-0.12, 0.16);
-  ctx.lineTo(-0.13, -0.46);
-  ctx.lineTo(-0.11, -0.62);
-  ctx.closePath();
-  ctx.fill();
-
-  // Beak
-  ctx.beginPath();
-  ctx.moveTo(0.06, -0.70);
-  ctx.lineTo(0.36, -0.62);
-  ctx.lineTo(0.06, -0.54);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.restore(); // out of the unit box; the wordmark wants real pixels
-
-  ctx.font = `bold ${(size * 0.3).toFixed(1)}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.fillText('SALEWA', 0, size * 0.95);
+  ctx.drawImage(logo, -w / 2, -h / 2, w, h);
   ctx.restore();
 }
 
@@ -182,10 +112,15 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
 
   // Shoe icon image for foot limbs (loaded once; mirrored for the left foot)
   const rightShoeImg = useRef<HTMLImageElement | null>(null);
+  const salewaImg = useRef<HTMLImageElement | null>(null);
   useEffect(() => {
     const r = new Image();
     r.src = rightShoesUrl;
     rightShoeImg.current = r;
+
+    const s = new Image();
+    s.src = salewaUrl;
+    salewaImg.current = s;
   }, []);
 
   // Game state refs to keep values stable across the animation loop
@@ -365,14 +300,24 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
       const rng = createRandom(`${settings.seed}_MARKS`);
       const colW = CANVAS_WIDTH / 2;
       for (let y = 260; y < WALL_HEIGHT; y += 620 + rng() * 380) {
-        const size = 34 + rng() * 30;
-        marks.push({
-          x: 70 + rng() * (colW - 140),
-          y,
-          size,
-          angle: (rng() - 0.5) * 0.5,
-          alpha: 0.28 + rng() * 0.22,
-        });
+        const size = 40 + rng() * 35;
+        // Logos are painted behind the holds, so a spot with holds on it is a
+        // logo you never see. Take the clearest patch out of a few throws,
+        // measuring to the edge of each hold rather than its centre.
+        let best = { x: colW / 2, y };
+        let clearest = -Infinity;
+        for (let attempt = 0; attempt < 14; attempt++) {
+          const cx = 80 + rng() * (colW - 160);
+          const cy = y + (rng() - 0.5) * 220;
+          let gap = Infinity;
+          for (const h of holds) {
+            if (Math.abs(h.y - cy) > 220) continue;
+            gap = Math.min(gap, Math.hypot(h.x - cx, h.y - cy) - h.size);
+          }
+          if (gap > clearest) { clearest = gap; best = { x: cx, y: cy }; }
+          if (gap > size * 0.8) break;
+        }
+        marks.push({ ...best, size, angle: (rng() - 0.5) * 0.4, alpha: 0.38 + rng() * 0.22 });
       }
     }
     wallMarksRef.current = marks;
@@ -1258,7 +1203,7 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
         for (const mark of wallMarksRef.current) {
           const sY = toScreenY(mark.y);
           if (sY < -mark.size || sY > VIEW_HEIGHT + mark.size) continue;
-          drawSalewaMark(ctx, toScreenX(mark.x), sY, mark.size, mark.angle, mark.alpha);
+          drawSalewaMark(ctx, salewaImg.current, toScreenX(mark.x), sY, mark.size, mark.angle, mark.alpha);
         }
 
         // --- DRAW BOTTOM SAFETY CRASH MAT ---

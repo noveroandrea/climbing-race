@@ -16,9 +16,10 @@ eagles sprayed up the panels, and Night Session is dark with the lights out —
 a wash over the whole column, climber included. The palettes live with the
 climbs in `src/climbs.ts`; `ClimbingCanvas` reads one via `themeFor`.
 
-The eagle is drawn from canvas paths in `ClimbingCanvas.tsx` (`paintSalewa`) —
-a hand-drawn homage of the kind a gym paints on its own panels, not the official
-artwork, and not an endorsement by or affiliation with Salewa.
+The eagle is `assets/salewa.png`, blitted behind the holds at seeded positions.
+The mark is Salewa's trademark, used here the way a gym paints a sponsor on its
+own panels — decoration in a personal, non-commercial project, not an
+endorsement by or affiliation with Salewa.
 
 Every wall gets harder with height, in 5m sections:
 
