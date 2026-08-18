@@ -16,6 +16,13 @@ eagles sprayed up the panels, and Night Session is dark with the lights out —
 a wash over the whole column, climber included. The palettes live with the
 climbs in `src/climbs.ts`; `ClimbingCanvas` reads one via `themeFor`.
 
+The climber is painted off the hold palette on purpose. Green, red, blue and
+amber belong to the four hold types, so the kit is cut from the two hues the
+wall never uses: violet arms (pale left, deep right) and pink legs (same), with
+a teal jersey for player 1 and fuchsia for player 2. Before this the climber was
+jug-green with a blue arm, an orange arm and a green leg — limbs that read as
+holds.
+
 The eagle is `assets/salewa.png`, blitted behind the holds at seeded positions.
 The mark is Salewa's trademark, used here the way a gym paints a sponsor on its
 own panels — decoration in a personal, non-commercial project, not an
@@ -65,7 +72,10 @@ runs out, the higher climber wins.
 ## Controls
 
 Click a limb to select it, then click a reachable hold to move it there;
-selection auto-cycles LH → RH → RF → LF. A hold takes one limb — except the big
+selection auto-cycles LH → RH → RF → LF. Limbs cannot cross: a foot never goes
+above your lowest hand and a hand never goes below your highest foot, which is
+the flat edge that cuts the reach arc into a dome. A hold with a limb already on
+it is not offered again — no highlight, no click. A hold takes one limb — except the big
 yellow **volumes**, which are wide enough for two in any pairing (a hand and a
 foot, both hands, or both feet); each limb grips its own corner of the volume,
 and reach is measured to that corner rather than to the middle of the blob. **Space** — or the **chalk bag button on

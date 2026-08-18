@@ -22,6 +22,9 @@ export const QuickStart: React.FC<{ onDismiss: () => void; onFullRules: () => vo
 
   const moves: [string, React.ReactNode][] = [
     [w.tap, <>a hold to move the selected limb there. {w.tap} a hand or foot to select a different one.</>],
+    ['No crossing:', <>a foot <strong className="text-sky-300">never goes above your lowest hand</strong>, and a hand
+      never goes below your highest foot — that is the flat edge cutting off the reach arc. To get a foot higher,
+      move a hand up first.</>],
     [w.doubleTap, <>your body for a new rock above your head — but you <strong className="text-rose-300">fall while placing it</strong>.</>],
     [w.hold, <>on your body for 2s to hammer a nail. Future falls stop there instead of the ground.</>],
     [`${w.tap} the chalk bag`, <>(top right of the wall) to make your energy last: for{' '}

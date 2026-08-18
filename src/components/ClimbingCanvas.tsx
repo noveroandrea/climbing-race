@@ -281,16 +281,21 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
     const holds = holdsRef.current;
     const bodyPos = { x: player.x, y: player.y };
 
-    // How many limbs this player already has on each hold. A normal hold is one
-    // grip and one grip only; a big yellow volume is a whole panel, so two limbs
-    // share it in any pairing — a hand and a foot, both hands, or both feet.
+    // How many limbs this player already has on each hold — all four of them,
+    // this one included, so a hold with a limb on it is never offered again. A
+    // normal hold is one grip and one grip only; a big yellow volume is a whole
+    // panel, so two limbs share it in any pairing — a hand and a foot, two
+    // hands, or two feet.
     const takenBy = new Map<string, number>();
     (['leftHand', 'rightHand', 'leftFoot', 'rightFoot'] as LimbName[]).forEach(ln => {
-      if (ln === limbName) return;
       const id = player[ln].holdId;
       if (id) takenBy.set(id, (takenBy.get(id) ?? 0) + 1);
     });
-    const isFull = (hold: Hold) => (takenBy.get(hold.id) ?? 0) >= limbCapacity(hold);
+    const ownHoldId = player[limbName].holdId;
+    // Free is free: a hold is out if it is at capacity, and the one this limb is
+    // already standing on is out too — moving a limb onto itself is not a move.
+    const isTaken = (hold: Hold) =>
+      hold.id === ownHoldId || (takenBy.get(hold.id) ?? 0) >= limbCapacity(hold);
 
     // Holds must lie within the reach circle (radius REACH_DISTANCE around the torso)
     // AND on the correct side of the limb-ordering line — this is exactly the dome
@@ -301,7 +306,7 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
     const topFootY = Math.max(player.leftFoot.y, player.rightFoot.y);
     const lowHandY = Math.min(player.leftHand.y, player.rightHand.y);
     const candidates = holds.filter(hold => {
-      if (isFull(hold)) return false;
+      if (isTaken(hold)) return false;
       // Measured to the spot this limb would actually grip, which on a shared
       // volume is off to one side rather than the middle of the blob.
       const grip = gripPoint(hold, limbName);
@@ -403,8 +408,10 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
       grounded: true,
     });
 
-    p1Ref.current = makeStandingClimber('player1', p1Name || 'Climber 1', '#4ade80', '#15803d');
-    p2Ref.current = makeStandingClimber('player2', p2Name || 'Climber 2', '#ef4444', '#991b1b');
+    // Jerseys are off the hold palette too: the old green climber was the exact
+    // green of a jug and the red one the exact red of a crimp.
+    p1Ref.current = makeStandingClimber('player1', p1Name || 'Climber 1', '#14b8a6', '#0f766e');
+    p2Ref.current = makeStandingClimber('player2', p2Name || 'Climber 2', '#e879f9', '#a21caf');
 
     // Pre-select the left hand of the player this client controls
     const lp = localPlayerRef.current;
@@ -1527,12 +1534,16 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
         const kneeL = calculateJointBend({ x: hipLX, y: hipY }, { x: scrLFX, y: scrLFY }, -1, 42);
         const kneeR = calculateJointBend({ x: hipRX, y: hipY }, { x: scrRFX, y: scrRFY }, 1, 42);
 
-        // Distinct color per limb for easy identification
+        // A climber must never be mistaken for the route. The four hold types own
+        // green, red, blue and amber, so the kit is cut from the two hues the
+        // wall never uses: violet for the arms, pink for the legs, pale on the
+        // left and saturated on the right. Family tells you hand from foot,
+        // shade tells you left from right, and nothing here reads as a hold.
         const limbColors = {
-          leftHand:  '#60a5fa', // blue
-          rightHand: '#fb923c', // orange
-          leftFoot:  '#c084fc', // purple
-          rightFoot: '#4ade80', // green
+          leftHand:  '#c4b5fd', // pale violet
+          rightHand: '#8b5cf6', // violet
+          leftFoot:  '#f9a8d4', // pale pink
+          rightFoot: '#ec4899', // pink
         };
 
         ctx.lineCap = 'round';
@@ -1982,9 +1993,9 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
       <div className="w-full flex items-center justify-between gap-1 px-1.5 sm:px-3 py-1 bg-slate-950/70 rounded-lg mb-2 text-[11px] sm:text-[13px] md:text-[15.5px] font-mono select-none" id="stats-ribbon">
         {localPlayer !== 'player2' && (
           <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 min-w-0">
-            <span className="text-emerald-400 font-bold truncate max-w-[72px] sm:max-w-none">P1 - {p1Name}</span>
+            <span className="text-teal-300 font-bold truncate max-w-[72px] sm:max-w-none">P1 - {p1Name}</span>
             <div className="w-8 sm:w-16 md:w-24 h-2 bg-slate-800 rounded-full overflow-hidden shrink-0">
-              <div className="h-full bg-emerald-500 transition-all duration-100" style={{ width: `${p1Stamina}%` }} />
+              <div className="h-full bg-teal-500 transition-all duration-100" style={{ width: `${p1Stamina}%` }} />
             </div>
             <span className="text-slate-500">
               H <span className="text-slate-200 font-bold">{p1Height}m</span>
@@ -2018,9 +2029,9 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
               <span className="text-slate-600">/{WALL_HEIGHT / 100}m</span>
             </span>
             <div className="w-8 sm:w-16 md:w-24 h-2 bg-slate-800 rounded-full overflow-hidden shrink-0">
-              <div className="h-full bg-red-500 transition-all duration-100" style={{ width: `${p2Stamina}%` }} />
+              <div className="h-full bg-fuchsia-500 transition-all duration-100" style={{ width: `${p2Stamina}%` }} />
             </div>
-            <span className="text-red-400 font-bold truncate max-w-[72px] sm:max-w-none">{p2Name} - P2</span>
+            <span className="text-fuchsia-300 font-bold truncate max-w-[72px] sm:max-w-none">{p2Name} - P2</span>
           </div>
         )}
       </div>
@@ -2088,7 +2099,7 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
         <div className="flex items-center gap-1.5">
           <span className="text-slate-500">Selected:</span>
           <span className={`px-2 py-0.5 rounded font-bold border ${
-            selectedUI.player === 'player1' ? 'text-emerald-400 border-emerald-500/40 bg-emerald-950/40' : 'text-red-400 border-rose-500/40 bg-rose-950/40'
+            selectedUI.player === 'player1' ? 'text-teal-300 border-teal-500/40 bg-teal-950/40' : 'text-fuchsia-300 border-fuchsia-500/40 bg-fuchsia-950/40'
           }`}>
             {limbDisplayName(selectedUI.limb)}
           </span>

@@ -83,7 +83,10 @@ export const QuickGuide: React.FC = () => {
     <dl className="text-[14.5px] leading-snug divide-y divide-slate-800/80 border-y border-slate-800/80">
       <div className="flex gap-2 py-1.5">
         <dt className="shrink-0 w-24 font-mono text-[12.5px] text-sky-400 pt-px uppercase">{w.taps} · {w.taps}</dt>
-        <dd className="text-slate-400">{w.tap} to select another limb, then {w.taps} to select a hold.</dd>
+        <dd className="text-slate-400">
+          {w.tap} to select another limb, then {w.taps} to select a hold. No foot above your lowest hand, no hand below
+          your highest foot.
+        </dd>
       </div>
       <div className="flex gap-2 py-1.5">
         <dt className="shrink-0 w-24 font-mono text-[12.5px] text-sky-400 pt-px">{touch ? 'BAG BUTTON' : 'SPACE · BAG'}</dt>
@@ -153,6 +156,12 @@ export const InstructionsContent: React.FC = () => {
         {w.tap} a hand or foot to select it, then {w.taps} a highlighted hold to move it there. Selection auto-cycles
         clockwise: <span className="font-mono text-slate-200">LH → RH → RF → LF</span>. Only holds inside the yellow
         reach arc are within range.
+      </p>
+      <p className="text-[15px] text-slate-300 leading-relaxed mt-2">
+        Your limbs also cannot cross each other: <strong className="text-slate-100">a foot can never go above your
+        lowest hand</strong>, and <strong className="text-slate-100">a hand can never go below your highest foot</strong>.
+        That is the flat edge you see cutting the reach arc off — holds on the far side of it are out, however close
+        they are. To get a foot higher, move a hand up first.
       </p>
     </section>
 
