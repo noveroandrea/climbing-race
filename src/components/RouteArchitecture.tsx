@@ -107,7 +107,7 @@ export const RouteArchitecture: React.FC<Props> = ({
           onPick={id => onChange(settingsForClimb(id))}
         />
         <p className="mt-1.5 text-[13px] text-slate-500 leading-snug">
-          Both climbers get the same wall. It sheds green holds every 5m — see “How to Climb”.
+          Both climbers get the same wall. It sheds green holds every 5m — see “How to Play”.
         </p>
       </div>
 

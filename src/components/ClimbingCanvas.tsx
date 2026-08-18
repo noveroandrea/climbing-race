@@ -131,8 +131,15 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
   const particlesRef = useRef<Particle[]>([]);
   const gameRunningRef = useRef<boolean>(false);
 
-  // Timers
+  // Timers. startTimeRef is 0 while the clock has not started yet: a solo run is
+  // not a race against a start gun, so the 2:00 only begins on the climber's
+  // first move — no run is burned reading the wall. A race still starts on the
+  // shared countdown, where both climbers are watching the same clock.
   const startTimeRef = useRef<number>(0);
+  const clockRunning = () => startTimeRef.current > 0;
+  const startClock = () => {
+    if (gameRunningRef.current && startTimeRef.current === 0) startTimeRef.current = Date.now();
+  };
   const elapsedRef = useRef<{ p1: number; p2: number }>({ p1: 0, p2: 0 });
   const [p1DisplayTime, setP1DisplayTime] = useState<number>(0);
   const [p2DisplayTime, setP2DisplayTime] = useState<number>(0);
@@ -226,8 +233,9 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
   const CHALK_REQUIRED = 70; // you need this much in the bag to chalk up
   const CHALK_COST = 70;     // and one dip drains exactly that, emptying it
 
-  // Timer display state
+  // Timer display state. clockIdle is the solo pause before the first move.
   const [timeRemaining, setTimeRemaining] = useState<number>(TIME_LIMIT_MS);
+  const [clockIdle, setClockIdle] = useState<boolean>(false);
 
   // Height in metres, the single-player score (100px of wall = 1m). A top-out
   // counts as the full wall — the finish line sits a little below the true top.
@@ -249,17 +257,40 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
     player.rightFoot = { ...s.rightFoot };
   };
 
+  /** How many of one climber's limbs a hold will take at once. */
+  const limbCapacity = (hold: Hold) => (hold.type === 'volume' ? 2 : 1);
+
+  /**
+   * Where on a hold a limb actually grips. Ordinary holds are gripped dead
+   * centre. A volume is wide enough for two limbs, so each one takes its own
+   * corner of it — left limbs left, hands high — and two limbs sharing a volume
+   * never end up drawn on top of each other.
+   */
+  const gripPoint = (hold: Hold, limbName: LimbName) => {
+    if (limbCapacity(hold) < 2) return { x: hold.x, y: hold.y };
+    const isLeft = limbName === 'leftHand' || limbName === 'leftFoot';
+    const isHand = limbName === 'leftHand' || limbName === 'rightHand';
+    return {
+      x: hold.x + (isLeft ? -1 : 1) * hold.size * 0.26,
+      y: hold.y + (isHand ? 1 : -1) * hold.size * 0.18,
+    };
+  };
+
   // Get all active, unique holds within REACH_DISTANCE (150px) from body position
   const getReachableHoldsForLimb = (player: Climber, limbName: 'leftHand' | 'rightHand' | 'leftFoot' | 'rightFoot'): Hold[] => {
     const holds = holdsRef.current;
     const bodyPos = { x: player.x, y: player.y };
 
-    // Find all other hold IDs currently held by this player to avoid crowding
-    const otherHoldIds = new Set<string>();
-    if (limbName !== 'leftHand' && player.leftHand.holdId) otherHoldIds.add(player.leftHand.holdId);
-    if (limbName !== 'rightHand' && player.rightHand.holdId) otherHoldIds.add(player.rightHand.holdId);
-    if (limbName !== 'leftFoot' && player.leftFoot.holdId) otherHoldIds.add(player.leftFoot.holdId);
-    if (limbName !== 'rightFoot' && player.rightFoot.holdId) otherHoldIds.add(player.rightFoot.holdId);
+    // How many limbs this player already has on each hold. A normal hold is one
+    // grip and one grip only; a big yellow volume is a whole panel, so two limbs
+    // share it in any pairing — a hand and a foot, both hands, or both feet.
+    const takenBy = new Map<string, number>();
+    (['leftHand', 'rightHand', 'leftFoot', 'rightFoot'] as LimbName[]).forEach(ln => {
+      if (ln === limbName) return;
+      const id = player[ln].holdId;
+      if (id) takenBy.set(id, (takenBy.get(id) ?? 0) + 1);
+    });
+    const isFull = (hold: Hold) => (takenBy.get(hold.id) ?? 0) >= limbCapacity(hold);
 
     // Holds must lie within the reach circle (radius REACH_DISTANCE around the torso)
     // AND on the correct side of the limb-ordering line — this is exactly the dome
@@ -270,11 +301,13 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
     const topFootY = Math.max(player.leftFoot.y, player.rightFoot.y);
     const lowHandY = Math.min(player.leftHand.y, player.rightHand.y);
     const candidates = holds.filter(hold => {
-      if (otherHoldIds.has(hold.id)) return false;
-      if (isHand && hold.y < topFootY) return false;
-      if (!isHand && hold.y > lowHandY) return false;
-      const dist = getDistance({ x: hold.x, y: hold.y }, bodyPos);
-      return dist <= REACH_DISTANCE;
+      if (isFull(hold)) return false;
+      // Measured to the spot this limb would actually grip, which on a shared
+      // volume is off to one side rather than the middle of the blob.
+      const grip = gripPoint(hold, limbName);
+      if (isHand && grip.y < topFootY) return false;
+      if (!isHand && grip.y > lowHandY) return false;
+      return getDistance(grip, bodyPos) <= REACH_DISTANCE;
     });
 
     // Sort clockwise starting from 12 o'clock (top → right → bottom → left)
@@ -391,7 +424,8 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
     setTimeRemaining(TIME_LIMIT_MS);
     
     if (gameState === 'playing') {
-      startTimeRef.current = Date.now();
+      // Solo waits for the first move (startClock); a race is already running.
+      startTimeRef.current = singlePlayerRef.current ? 0 : Date.now();
       gameRunningRef.current = true;
     } else {
       gameRunningRef.current = false;
@@ -632,6 +666,7 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
     }
 
     {
+      startClock();
       player.chalk = Math.max(0, player.chalk - CHALK_COST);
       player.chalkPowerTime = 5000; // 5 seconds of grip buff
       player.stamina = Math.min(player.maxStamina, player.stamina + 22); // subtle recovery
@@ -668,9 +703,11 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
     const candidates = getReachableHoldsForLimb(player, limbName);
     if (!candidates.some(c => c.id === hold.id)) return false;
 
+    startClock();
+    const grip = gripPoint(hold, limbName);
     player[limbName].holdId = hold.id;
-    player[limbName].targetX = hold.x;
-    player[limbName].targetY = hold.y;
+    player[limbName].targetX = grip.x;
+    player[limbName].targetY = grip.y;
     player[limbName].lerpFactor = 0; // Trigger slide/reaching animation
 
     spawnParticles(hold.x, hold.y, '#e5e7eb', 8);
@@ -683,6 +720,7 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
 
   // Stone-throw sabotage: place a crimp 1m above thrower's head, thrower falls immediately
   const throwStone = (thrower: Climber) => {
+    startClock();
     const halfW = CANVAS_WIDTH / 2;
     const stoneX = Math.max(40, Math.min(halfW - 40, thrower.x));
     const stoneY = thrower.y + 100;
@@ -722,6 +760,7 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
   // Hammer a nail into the wall at the climber's current position — it will catch
   // a later fall (acts as a safety anchor / piton).
   const placeNail = (player: Climber) => {
+    startClock();
     nailsRef.current = [
       ...nailsRef.current,
       { id: `nail_${Date.now()}_${Math.random()}`, player: player.id, x: player.x, y: player.y },
@@ -741,7 +780,7 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
     const topOutLineY = WALL_HEIGHT - 120;
     if (player.y >= topOutLineY) {
       player.hasFinished = true;
-      const finishedTime = Date.now() - startTimeRef.current;
+      const finishedTime = clockRunning() ? Date.now() - startTimeRef.current : 0;
       
       if (player.id === 'player1') {
         elapsedRef.current.p1 = finishedTime;
@@ -794,17 +833,19 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
       if (p1.chalkPowerTime > 0) p1.chalkPowerTime -= 16;
       if (p2.chalkPowerTime > 0) p2.chalkPowerTime -= 16;
 
-      // Update display clocks
-      const elapsed = now - startTimeRef.current;
+      // Update display clocks. Before the first move the clock reads a full 2:00
+      // and nothing counts against it.
+      const elapsed = clockRunning() ? now - startTimeRef.current : 0;
       if (!p1.hasFinished) setP1DisplayTime(elapsed);
       if (!p2.hasFinished) setP2DisplayTime(elapsed);
 
       // Update countdown timer display
       const remaining = Math.max(0, TIME_LIMIT_MS - elapsed);
       setTimeRemaining(remaining);
+      setClockIdle(!clockRunning());
 
       // Time limit check — highest player wins (only local clients fire this)
-      if (remaining === 0 && gameRunningRef.current && localPlayerRef.current !== 'spectator') {
+      if (clockRunning() && remaining === 0 && gameRunningRef.current && localPlayerRef.current !== 'spectator') {
         gameRunningRef.current = false;
         // Solo runs have no opponent to out-climb: the run simply ends where it is.
         const winner: 'player1' | 'player2' = singlePlayerRef.current ? 'player1' : p1.y >= p2.y ? 'player1' : 'player2';
@@ -1749,7 +1790,7 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
         drawPlayerWall(p2, halfW, p1.y);
 
         // Countdown timer on divider
-        const timeLeft = Math.max(0, TIME_LIMIT_MS - (now - startTimeRef.current));
+        const timeLeft = clockRunning() ? Math.max(0, TIME_LIMIT_MS - (now - startTimeRef.current)) : TIME_LIMIT_MS;
         const mins = Math.floor(timeLeft / 60000);
         const secs = Math.floor((timeLeft % 60000) / 1000);
         const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -1958,10 +1999,12 @@ export const ClimbingCanvas: React.FC<ClimbingCanvasProps> = ({
 
         {/* Central countdown */}
         <div className="flex flex-col items-center leading-none shrink-0">
-          <span className={`font-bold text-[15px] sm:text-[18px] ${timeRemaining < 30000 ? 'text-red-400 animate-pulse' : timeRemaining < 60000 ? 'text-amber-400' : 'text-sky-400'}`}>
+          <span className={`font-bold text-[15px] sm:text-[18px] ${clockIdle ? 'text-slate-400' : timeRemaining < 30000 ? 'text-red-400 animate-pulse' : timeRemaining < 60000 ? 'text-amber-400' : 'text-sky-400'}`}>
             {Math.floor(timeRemaining / 60000)}:{Math.floor((timeRemaining % 60000) / 1000).toString().padStart(2, '0')}
           </span>
-          <span className="text-[9px] sm:text-[11.5px] text-slate-500 uppercase tracking-wider">Time Left</span>
+          <span className="text-[9px] sm:text-[11.5px] text-slate-500 uppercase tracking-wider">
+            {clockIdle ? 'Starts on your first move' : 'Time Left'}
+          </span>
         </div>
 
         {localPlayer !== 'player1' && (

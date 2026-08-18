@@ -35,7 +35,7 @@ const HOLDS: { kind: SwatchKind; name: string; tone: string; border: string; tex
     name: 'Volume',
     tone: 'bg-amber-950/40',
     border: 'border-amber-500/20',
-    text: 'Big plywood blocks. Excellent anchors for long reaches, and they cap the top-out ledge.',
+    text: 'Big plywood blocks — wide enough for two limbs at once, in any pairing: a hand and a foot, both hands, or both feet. Excellent anchors for long reaches, and they cap the top-out ledge.',
   },
 ];
 
@@ -43,13 +43,13 @@ const QUICK_HOLDS: { kind: SwatchKind; name: string; note: string; color: string
   { kind: 'jug',    name: 'Jug',    note: 'safe · rest · nail here', color: 'text-emerald-400' },
   { kind: 'crimp',  name: 'Crimp',  note: 'drains 4×',               color: 'text-rose-400' },
   { kind: 'sloper', name: 'Sloper', note: 'slippery',                color: 'text-sky-400' },
-  { kind: 'volume', name: 'Volume', note: 'big reach',               color: 'text-amber-400' },
+  { kind: 'volume', name: 'Volume', note: 'fits two limbs',          color: 'text-amber-400' },
   { kind: 'rock',   name: 'Rock',   note: 'you placed it',           color: 'text-stone-400' },
 ];
 
 /**
  * The cheat-sheet that sits beside the wall while you climb. Deliberately thin —
- * the full briefing lives behind the "How to Climb" button in the header.
+ * the full briefing lives behind the "How to Play" button in the header.
  */
 export const QuickGuide: React.FC = () => {
   const touch = useIsTouch();
@@ -103,7 +103,7 @@ export const QuickGuide: React.FC = () => {
       </div>
     </dl>
 
-    <p className="text-[13px] text-slate-600 text-center">Full rules: “How to Climb”, top right.</p>
+    <p className="text-[13px] text-slate-600 text-center">Full rules: “How to Play”, top right.</p>
   </div>
   );
 };

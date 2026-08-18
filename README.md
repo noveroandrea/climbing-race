@@ -48,7 +48,9 @@ the single source of truth, and the in-app ramp card reads from them.
 
 ## Modes
 
-**Single Player** — pick a wall, **120 seconds** on the clock. Ends when you top
+**Single Player** — pick a wall, **120 seconds** on the clock, and the clock does
+not start until you make your first move: no run is burned reading the route.
+(A race is different — it starts on the shared countdown.) Ends when you top
 out or time runs out; your score is the height in metres you reached, saved under
 a name you enter. **Each wall keeps its own Hall of Fame**, and a name owns one
 record per wall: a run only goes on the board if it beats what that name already
@@ -63,12 +65,19 @@ runs out, the higher climber wins.
 ## Controls
 
 Click a limb to select it, then click a reachable hold to move it there;
-selection auto-cycles LH → RH → RF → LF. **Space** — or the **chalk bag button on
+selection auto-cycles LH → RH → RF → LF. A hold takes one limb — except the big
+yellow **volumes**, which are wide enough for two in any pairing (a hand and a
+foot, both hands, or both feet); each limb grips its own corner of the volume,
+and reach is measured to that corner rather than to the middle of the blob. **Space** — or the **chalk bag button on
 the top right of the wall**, which is how you do it on a phone — chalks up, which
 makes your stamina drain 55% slower for 5 seconds (needs 70% in the bag, drains
 70%; it never refills stamina — only resting both hands on jugs does that). **Double-tap your body** to place a rock — it eases the climb
 but drops you to your last nail. **Hold your body for 2 seconds** on four green
 jugs to hammer a nail, which catches your next fall.
+
+The short version of all this pops up over the menu on the first visit and
+closes for good on "OK, got it" — the **How to Play** button in the header is the
+way back to it, and the full briefing sits one click further in.
 
 On a touch screen every click above is a tap and there is no keyboard, so the
 instructions rewrite themselves — `useIsTouch` (`src/lib/useIsTouch.ts`) watches

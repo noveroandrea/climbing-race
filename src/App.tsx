@@ -82,7 +82,8 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('menu');
   const [mode, setMode] = useState<Mode>('single');
   const [showInstructions, setShowInstructions] = useState(false);
-  // Back every visit, not just the first — folded away for this session only.
+  // Pops up over the menu on arrival, once. Closing it is final for the session;
+  // the How to Play button in the header is the way back in.
   const [showQuickStart, setShowQuickStart] = useState(true);
   const isTouch = useIsTouch();
   const pointer = usePointerWords();
@@ -536,12 +537,12 @@ export default function App() {
             </button>
           )}
           <button
-            onClick={() => setShowInstructions(true)}
-            aria-label="How to climb"
+            onClick={() => setShowQuickStart(true)}
+            aria-label="How to play"
             className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 rounded-lg text-[13px] sm:text-[15.5px] font-medium text-slate-300 transition-all cursor-pointer"
           >
             <HelpCircle className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-            <span className="hidden sm:inline">How to Climb</span>
+            <span className="hidden sm:inline">How to Play</span>
           </button>
         </div>
       </header>
@@ -549,7 +550,6 @@ export default function App() {
       {/* ══ MENU ═════════════════════════════════════════════════════════════ */}
       {screen === 'menu' && (
         <main className="flex-1 w-full max-w-3xl mx-auto p-6 flex flex-col gap-6">
-          {showQuickStart && <QuickStart onDismiss={() => setShowQuickStart(false)} />}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1073,7 +1073,13 @@ export default function App() {
         </main>
       )}
 
-      {/* ── Instructions modal ───────────────────────────────────────────────── */}
+      {/* ── How to play, and the full rules behind it ────────────────────────── */}
+      {showQuickStart && (
+        <QuickStart
+          onDismiss={() => setShowQuickStart(false)}
+          onFullRules={() => { setShowQuickStart(false); setShowInstructions(true); }}
+        />
+      )}
       {showInstructions && <InstructionsModal onClose={() => setShowInstructions(false)} />}
 
       {/* ── Solo score submission ────────────────────────────────────────────── */}
